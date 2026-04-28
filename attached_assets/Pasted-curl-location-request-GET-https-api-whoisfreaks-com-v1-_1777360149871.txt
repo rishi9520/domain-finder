@@ -1,0 +1,119 @@
+curl --location --request GET 'https://api.whoisfreaks.com/v1.0/whois?whois=live&domainName=whoisfreaks.com&apiKey=API_KEY'
+[
+  {
+    "status": true,
+    "domain_name": "whoisfreaks.com",
+    "query_time": "2024-07-11 13:03:30",
+    "whois_server": "whois.verisign-grs.com",
+    "domain_registered": "yes",
+    "create_date": "2019-03-19",
+    "update_date": "2024-02-18",
+    "expiry_date": "2025-03-19",
+    "domain_registrar": {
+      "iana_id": "1068",
+      "registrar_name": "NAMECHEAP INC",
+      "whois_server": "whois.namecheap.com",
+      "website_url": "http://www.namecheap.com",
+      "email_address": "abuse@namecheap.com",
+      "phone_number": "+1.9854014545"
+    },
+    "reseller_contact": {
+      "name": "NAMECHEAP INC",
+      "email_address": "N/A",
+      "phone": "N/A"
+    },
+    "registrant_contact": {
+      "name": "Redacted for Privacy",
+      "company": "Privacy service provided by Withheld for Privacy ehf",
+      "street": "Kalkofnsvegur 2",
+      "city": "Reykjavik",
+      "state": "Capital Region",
+      "zip_code": "101",
+      "country_name": "Iceland",
+      "country_code": "IS",
+      "email_address": "b8e54d7b11b347b285b60992e0889dde.protect@withheldforprivacy.com",
+      "phone": "+354.4212434",
+      "fax": "N/A",
+      "mailing_address": "Kalkofnsvegur 2, 101 Reykjavik, Capital Region, Iceland"
+    },
+    "administrative_contact": {
+      "name": "Redacted for Privacy",
+      "company": "Privacy service provided by Withheld for Privacy ehf",
+      "street": "Kalkofnsvegur 2",
+      "city": "Reykjavik",
+      "state": "Capital Region",
+      "zip_code": "101",
+      "country_name": "Iceland",
+      "country_code": "IS",
+      "email_address": "b8e54d7b11b347b285b60992e0889dde.protect@withheldforprivacy.com",
+      "phone": "+354.4212434",
+      "fax": "N/A",
+      "mailing_address": "Kalkofnsvegur 2, 101 Reykjavik, Capital Region, Iceland"
+    },
+    "technical_contact": {
+      "name": "Redacted for Privacy",
+      "company": "Privacy service provided by Withheld for Privacy ehf",
+      "street": "Kalkofnsvegur 2",
+      "city": "Reykjavik",
+      "state": "Capital Region",
+      "zip_code": "101",
+      "country_name": "Iceland",
+      "country_code": "IS",
+      "email_address": "b8e54d7b11b347b285b60992e0889dde.protect@withheldforprivacy.com",
+      "phone": "+354.4212434",
+      "fax": "N/A",
+      "mailing_address": "Kalkofnsvegur 2, 101 Reykjavik, Capital Region, Iceland"
+    },
+    "billing_contact": {
+      "name": "N/A",
+      "company": "N/A",
+      "street": "N/A",
+      "city": "N/A",
+      "state": "N/A",
+      "zip_code": "N/A",
+      "country_name": "N/A",
+      "country_code": "N/A",
+      "email_address": "N/A",
+      "phone": "N/A",
+      "fax": "N/A",
+      "mailing_address": "N/A"
+    },
+    "name_servers": [
+      "dns3.cloudns.net",
+      "dns4.cloudns.net",
+      "dns7.cloudns.net",
+      "dns8.cloudns.net"
+    ],
+    "domain_status": [
+      "clientTransferProhibited"
+    ],
+    "whois_raw_domain": " Domain name: whoisfreaks.com Registry Domain ID: 2370976244_DOMAIN_COM-VRSN Registrar WHOIS Server: whois.namecheap.com Registrar URL: http://www.namecheap.com Updated Date: 2024-02-18T08:28:27.96Z Creation Date: 2019-03-19T18:24:27.00Z Registrar Registration Expiration Date: 2025-03-19T18:24:27.00Z Registrar: NAMECHEAP INC Registrar IANA ID: 1068 Registrar Abuse Contact Email: abuse@namecheap.com Registrar Abuse Contact Phone: +1.9854014545 Reseller: NAMECHEAP INC Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited Registry Registrant ID:  Registrant Name: Redacted for Privacy Registrant Organization: Privacy service provided by Withheld for Privacy ehf Registrant Street: Kalkofnsvegur 2  Registrant City: Reykjavik Registrant State/Province: Capital Region Registrant Postal Code: 101 Registrant Country: IS Registrant Phone: +354.4212434 Registrant Phone Ext:  Registrant Fax:  Registrant Fax Ext:  Registrant Email: b8e54d7b11b347b285b60992e0889dde.protect@withheldforprivacy.com Registry Admin ID:  Admin Name: Redacted for Privacy Admin Organization: Privacy service provided by Withheld for Privacy ehf Admin Street: Kalkofnsvegur 2  Admin City: Reykjavik Admin State/Province: Capital Region Admin Postal Code: 101 Admin Country: IS Admin Phone: +354.4212434 Admin Phone Ext:  Admin Fax:  Admin Fax Ext:  Admin Email: b8e54d7b11b347b285b60992e0889dde.protect@withheldforprivacy.com Registry Tech ID:  Tech Name: Redacted for Privacy Tech Organization: Privacy service provided by Withheld for Privacy ehf Tech Street: Kalkofnsvegur 2  Tech City: Reykjavik Tech State/Province: Capital Region Tech Postal Code: 101 Tech Country: IS Tech Phone: +354.4212434 Tech Phone Ext:  Tech Fax:  Tech Fax Ext:  Tech Email: b8e54d7b11b347b285b60992e0889dde.protect@withheldforprivacy.com Name Server: dns3.cloudns.net Name Server: dns4.cloudns.net Name Server: dns7.cloudns.net Name Server: dns8.cloudns.net DNSSEC: unsigned URL of the ICANN WHOIS Data Problem Reporting System: http://wdprs.internic.net/ >>> Last update of WHOIS database: 2024-07-11T08:03:30.50Z <<< For more information on Whois status codes, please visit https://icann.org/epp",
+    "registry_data": {
+      "domain_name": "WHOISFREAKS.COM",
+      "query_time": "2024-07-11 13:03:30",
+      "whois_server": "whois.verisign-grs.com",
+      "domain_registered": "yes",
+      "create_date": "N/A",
+      "update_date": "N/A",
+      "expiry_date": "N/A",
+      "domain_registrar": {
+        "iana_id": "1068",
+        "registrar_name": "NameCheap, Inc.",
+        "whois_server": "whois.namecheap.com",
+        "website_url": "http://www.namecheap.com",
+        "email_address": "abuse@namecheap.com",
+        "phone_number": "+1.6613102107"
+      },
+      "name_servers": [
+        "dns3.cloudns.net",
+        "dns4.cloudns.net",
+        "dns7.cloudns.net",
+        "dns8.cloudns.net"
+      ],
+      "domain_status": [
+        "clientTransferProhibited"
+      ],
+      "whois_raw_registry": "    Domain Name: WHOISFREAKS.COM    Registry Domain ID: 2370976244_DOMAIN_COM-VRSN    Registrar WHOIS Server: whois.namecheap.com    Registrar URL: http://www.namecheap.com    Updated Date: 2024-02-18T08:28:27Z    Creation Date: 2019-03-19T18:24:27Z    Registry Expiry Date: 2025-03-19T18:24:27Z    Registrar: NameCheap, Inc.    Registrar IANA ID: 1068    Registrar Abuse Contact Email: abuse@namecheap.com    Registrar Abuse Contact Phone: +1.6613102107    Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited    Name Server: DNS3.CLOUDNS.NET    Name Server: DNS4.CLOUDNS.NET    Name Server: DNS7.CLOUDNS.NET    Name Server: DNS8.CLOUDNS.NET    DNSSEC: unsigned    URL of the ICANN Whois Inaccuracy Complaint Form: https://www.icann.org/wicf/ >>> Last update of whois database: 2024-07-11T13:03:13Z <<<  For more information on Whois status codes, please visit https://icann.org/epp  NOTICE: The expiration date displayed in this record is the date the registrar's sponsorship of the domain name registration in the registry is currently set to expire. This date does not necessarily reflect the expiration date of the domain name registrant's agreement with the sponsoring registrar.  Users may consult the sponsoring registrar's Whois database to view the registrar's reported date of expiration for this registration.  TERMS OF USE: You are not authorized to access or query our Whois database through the use of electronic processes that are high-volume and automated except as reasonably necessary to register domain names or modify existing registrations; the Data in VeriSign Global Registry Services' (\"VeriSign\") Whois database is provided by VeriSign for information purposes only, and to assist persons in obtaining information about or related to a domain name registration record. VeriSign does not guarantee its accuracy. By submitting a Whois query, you agree to abide by the following terms of use: You agree that you may use this Data only for lawful purposes and that under no circumstances will you use this Data to: (1) allow, enable, or otherwise support the transmission of mass unsolicited, commercial advertising or solicitations via e-mail, telephone, or facsimile; or (2) enable high volume, automated, electronic processes that apply to VeriSign (or its computer systems). The compilation, repackaging, dissemination or other use of this Data is expressly prohibited without the prior written consent of VeriSign. You agree not to use electronic processes that are automated and high-volume to access or query the Whois database except as reasonably necessary to register domain names or modify existing registrations. VeriSign reserves the right to restrict your access to the Whois database in its sole discretion to ensure operational stability.  VeriSign may restrict or terminate your access to the Whois database for failure to abide by these terms of use. VeriSign reserves the right to modify these terms at any time.  The Registry database contains ONLY .COM, .NET, .EDU domains and Registrars."
+    }
+  }
+]

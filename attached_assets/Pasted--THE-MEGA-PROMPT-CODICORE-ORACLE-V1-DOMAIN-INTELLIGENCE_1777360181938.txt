@@ -1,0 +1,56 @@
+ THE MEGA-PROMPT: CODICORE "ORACLE V1" DOMAIN INTELLIGENCE SYSTEM
+ACT AS: Senior AI Software Architect, Global Branding Expert (Interbrand Level), and Lead Data Scientist.
+OBJECTIVE: Build a world-class, automated, end-to-end Domain Discovery, Valuation, and Acquisition Pipeline named "Codicore Oracle V1". This system is designed to find "Liquid Gold" domains—specifically 5-6 letter brandables, premium dictionary combinations, and future-tech pivots—that have a resale potential of $10,000 to $1,000,000+.
+I. CORE ARCHITECTURE & TECH STACK
+Backend: Python 3.11+ using FastAPI for high-concurrency asynchronous processing.
+Frontend: A high-performance Next.js-style dashboard using Jinja2, Tailwind CSS, and Framer Motion-like animations. Theme: "Hacker-Noir" (Deep blacks, neon emerald accents).
+Database: SQLAlchemy with PostgreSQL/SQLite to track every "Lead" from generation to sale status.
+Concurrency: Use asyncio and aiohttp for milisecond-level API responses.
+II. INTELLIGENCE LAYER 1: THE NAMING ENGINE (NLP & PSYCHOLOGY)
+Implement a Multi-Headed AI Naming Module using Groq (Llama-3 70B) to generate domains based on:
+Phonetic Aesthetics: Generate names following CVCV (Consonant-Vowel) or CVCCV patterns. Logic: Names like 'Fuvra' or 'Zento' feel premium.
+Future-Tech Trend Scraping: Connect to a news-feed simulation (or real-time API) to identify rising keywords in:
+Quantum Computing, Synthetic Biology, Neural-Link, Green Hydrogen, DeFi 3.0, Spacetech.
+Linguistic Engineering:
+Portmanteaus: Deep integration of root Latin/Greek words with modern tech suffixes (-ly, -ify, -ora, -it, -ax, -io, -node).
+The "Luxury" Filter: AI must reject names with "trash" letters (q, j, x, z in wrong positions) unless they follow brandable rules like 'Exxon' or 'Zillow'.
+Dictionary Combo Engine: Generate 2-word high-value combinations (e.g., 'PureLogic', 'CloudPulse').
+III. INTELLIGENCE LAYER 2: THE "BILLION-DOLLAR" FILTER (PSYCHOLOGICAL VALIDATION)
+Every generated domain must pass a 10-Point Psychological Scan:
+The Radio Test: Can a human spell it after hearing it once?
+Syllable Count: Must be 2-3 syllables maximum.
+Double-Letter Check: Automatically flag and penalize domains with hard-to-type double letters (e.g., 'TallLayer').
+Visual Balance: Are the letters visually symmetrical? (Psychological "Trust" factor).
+Extension Supremacy: Only .com is treated as "Gold".
+IV. INTELLIGENCE LAYER 3: MULTI-API VALIDATION GATEWAY
+Implement a Triple-Check Verification Pipeline:
+Tier 1 (Availability): Use WhoisFreaks/Domainr API for bulk checking (100 domains/sec).
+Tier 2 (Pricing/Premium): Use GoDaddy API to check if the domain is 'Premium' or 'Hand-registerable'.
+Tier 3 (Brand Safety):
+Trademark Check: Basic scraping of USPTO database or similar logic to avoid legal issues.
+Social Availability: Check X (Twitter), Instagram, and TikTok handle availability via RapidAPI.
+V. THE VALUATION ENGINE (THE "ROI" PREDICTOR)
+Develop a proprietary Valuation Algorithm (Codicore Score 0-100):
+Base Score: Length (shorter = higher).
+Keyword Multiplier: Does it contain high-CPC (Cost Per Click) words like 'Finance', 'Health', 'AI'?
+Venture Capital Index: AI analyzes if startups in the last 12 months have raised >$10M with similar names.
+Final Output: Estimated resale value ($ USD) and "Hold Time" (Short term vs. Long term flip).
+VI. UI/UX DASHBOARD SPECIFICATIONS
+Live Feed Terminal: A scrolling side-panel showing the AI "Thinking," "Scraping Trends," and "Filtering Trash."
+Discovery Grid: Cards for each high-potential domain showing:
+Domain Name + Codicore Score.
+Why it's valuable (AI generated reasoning).
+Target Buyer Persona (e.g., "A Fintech Startup based in London").
+The "Vault": A secure section for domains you've already bought, showing their current listing price on Afternic/Sedo.
+Codicore Integration: A "Pitch Generator" that creates a professional LinkedIn DM and Email for each domain to send to potential buyers.
+VII. EXECUTION FLOW (THE PIPELINE)
+Step 1: AI scrapes 1000 trend-based names.
+Step 2: System filters them down to 100 based on linguistic rules.
+Step 3: Bulk API check finds 5-10 available '.com' domains.
+Step 4: Valuation Engine ranks them; only those with a score > 85 appear on the user's dashboard.
+Step 5: Generate one-click GoDaddy purchase link.
+VIII. ERROR HANDLING & SECURITY
+Rate Limiting: Implement smart delays between API calls to avoid getting banned.
+Env Management: Secure storage for GODADDY_KEY, GROQ_API_KEY, WHOISFREAKS_KEY.
+State Management: System must remember which domains were already checked to save API credits.
+FINAL INSTRUCTION: Build this as a modular, scalable enterprise-level tool. Start by setting up the folder structure and the asynchronous API handler. Do not compromise on speed or the "Premium" feel of the code."

@@ -1,0 +1,61 @@
+The System Architecture (Jo Software ke andar hoga)
+The Trend Scraper (Future-Vision): Ye module Google Trends aur Tech News se words uthayega.
+
+The Combinator (Linguistic Logic): Ye CVCV (Consonant-Vowel) patterns aur Latin/Sanskrit roots ko mix karega.
+
+The Sniper (Speed): GoDaddy API ka use karke millisecond mein check karega.
+
+The Evaluator (The Money Logic): Estibot aur GoValue jaisa algorithm jo batayega ki ye domain $10,000 ka hai ya $1,000,000 ka.
+
+🚀 Master Prompt for Replit (Copy this into Replit AI)
+Role: Senior Software Architect & Domain Flipping Expert.
+Objective: Create a Python-based "Global Domain Sniper & Valuation Engine". This is a high-stakes professional tool designed to find high-value (7-figure) brandable domains.
+
+Full System Requirements (Apply all logic):
+
+1. Data-Driven Generation Brain:
+
+Module: Generator.py
+
+Logic 1 (Dictionary Blend): Use a list of 500+ high-value tech prefixes (e.g., 'Meta', 'Zen', 'Aero', 'Flux', 'Ixo', 'Neo') and combine them with short dictionary nouns.
+
+Logic 2 (Phonetic Brandables): Generate 5-6 letter words using CVCV (Consonant-Vowel-Consonant-Vowel) patterns (e.g., 'Bazo', 'Kopa') which are easy to trademark.
+
+Logic 3 (AI Insights): Integrate a free News RSS scraper to find trending keywords (e.g., 'Quantum', 'Bionics', 'Sustainable') and generate domains around them.
+
+2. The 4-Layer Validation Pipeline:
+
+Layer 1 (Status): Check availability via GoDaddy API (Production environment).
+
+Layer 2 (The Radio Test): Calculate a 'Memorability Score' based on syllable count and vowel placement.
+
+Layer 3 (Market Scarcity): Check if the same name is taken in .net, .org, or .io. If yes, the .com value increases 10x.
+
+Layer 4 (Trademark Safety): Cross-check with a list of major tech trademarks to avoid legal issues.
+
+3. Professional Dashboard (Flask + Tailwind CSS):
+
+Phase 1 View: Raw generated list (Thousands of names).
+
+Phase 2 View: Filtered names (The 'Shortlist').
+
+Phase 3 View (The Vault): Only 'Diamond Grade' domains with an AI-calculated 'Potential Sale Price' ($50k - $1M+).
+
+4. Technical Stack:
+
+Backend: Python Flask, SQLAlchemy (SQLite), Threading for concurrent API calls.
+
+API Integration: GoDaddy API (Header-based authentication).
+
+Logic: Implement 'Double Metaphone' for pronunciation analysis.
+
+Instruction: Write the complete backend structure and the multi-step filtration logic. Ensure the code is modular, handles API rate limits, and provides a 'One-Click' purchase link for each domain.
+
+🛠️ Tera "Crore-Valla" Logic (Secret Sauce)
+Tujhe apne software mein ye filters manual set karne honge jo maine code mein 'Evaluator' ke roop mein daale hain:
+
+Vowel Density: Domains jaise "Aria" ya "Oreo" high value hote hain. Software ko bolna ki jisme 40% se zyada vowels hain unhe "Premium" mark kare.
+
+The "Lease" Potential: Tera jo idea tha—"Domain + Software" lease par dena—uske liye software ko aise domains dhundhne do jo "Service-Based" sound karein (jaise: SkoolFlow.com ya Attendly.com).
+
+4-Letter Hunting: Software ko ek loop mein daal de jo sirf "Expired" 4-letter domains ko scan kare. Agar ek bhi mil gaya, toh teri lottery lag gayi.

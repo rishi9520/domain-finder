@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Domain Hunter Intelligence"
+version = "1.0.0"
+id = "artifacts/domain-hunter"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23947
+
+[services.development]
+run = "pnpm --filter @workspace/domain-hunter run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/domain-hunter", "run", "build" ]
+publicDir = "artifacts/domain-hunter/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23947"
+BASE_PATH = "/"

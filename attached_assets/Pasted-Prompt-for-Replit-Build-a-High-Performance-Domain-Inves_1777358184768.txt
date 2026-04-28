@@ -1,0 +1,23 @@
+Prompt for Replit:
+"Build a High-Performance Domain Investment Intelligence System (Python/FastAPI).
+1. Real-time Trend Integration: Use Groq API (Llama-3) to fetch emerging keywords in Deep-Tech (Quantum, AI, Bio-engineering, Space-Tech). Generate 5-6 letter brandable .com names based on these trends.
+2. Psychographic Filtering: Implement a logic that checks for:
+Phonetic Appeal: Must follow CVCV or CVCCV patterns (Consonant-Vowel).
+Memorability Score: AI must rate how easy it is for a human to remember the name.
+Avoid Trash: Automatically filter out hyphens, numbers, and awkward letter combinations (like 'qxy', 'zjw').
+3. 4-Letter Exhaustive Search: Add a module that specifically scans for remaining 4-letter combinations (Letter-Number-Letter-Letter or Letter-Letter-Number-Letter) since all-letter domains are gone.
+4. Multi-Step Validation:
+Step 1: Rapid-fire availability check via GoDaddy API.
+Step 2: Trademark Conflict Check (Check if the name is already a big company).
+Step 3: Social Media Handle Check (Check if @username is available on X/Twitter).
+5. Speed & UI: Use Asynchronous Python (asyncio) for extreme speed. Build a 'Matrix-style' dashboard that streams high-value domains as they are found.
+6. Future Tech Suffixes: Focus on future-suffixes: -bio, -nexus, -pulse, -grid, -layer, -node, -zero.
+Tech Stack: Python, FastAPI, Groq API (Free Tier), GoDaddy OTE/Production API."
+5. Crore-Value Domains dhoondhne ki 2 Special Strategy:
+Strategy A: The "Dictionary Hack"
+4-letter dictionary words (like Acid.com, Book.com) sab bik chuke hain. Lekin 2-word combinations jinka matlab nikalta ho, wo abhi bhi bache hain.
+Example: AI + Logic = Ailogic.com (Bik gaya hoga, lekin AI + Kuch naya keyword dhoondo).
+Software Logic: AI ko bolo 200 aisi industries ki list nikaale jo 2026 tak grow karengi, aur unhe "Power Words" ke saath merge kare.
+Strategy B: The "Transliteration" (Hinglish/Global)
+Tune "Dhandola.com" liya hai. "Dhanda" (Business) + "Ola" (Catchy suffix). Aise names ki value India ke naye Unicorns ke liye bahut hai.
+Software Logic: Hindi, Spanish, ya Latin ke "Root Words" uthao jo "Success" ya "Speed" dikhate hon aur unhe English suffixes ke saath jodo.

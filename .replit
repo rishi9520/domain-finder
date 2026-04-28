@@ -18,3 +18,21 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+GROQ_API_KEY = "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"
+GODADDY_API_KEY = "h29GBcwXZnGQ_W5VuCFtsTJjZTQA7SCG78N"
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 23947
+externalPort = 80

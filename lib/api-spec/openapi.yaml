@@ -3,13 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Domain Hunter Intelligence API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: trends
+    description: AI trend keyword generation
+  - name: hunt
+    description: Domain generation and scoring
+  - name: domains
+    description: Domain validation (availability, social, trademark)
+  - name: saved
+    description: Saved domain shortlist
+  - name: stats
+    description: Dashboard analytics
 paths:
   /healthz:
     get:
@@ -24,6 +34,185 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /trends:
+    post:
+      operationId: generateTrends
+      tags: [trends]
+      summary: Generate trending tech keywords for a category
+      description: Uses Groq Llama-3 to surface emerging keywords for a deep-tech category.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateTrendsInput"
+      responses:
+        "200":
+          description: Trend keywords
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendBundle"
+
+  /hunt:
+    post:
+      operationId: huntDomains
+      tags: [hunt]
+      summary: Generate, score and (optionally) validate a batch of domain candidates
+      description: |
+        Given a category and strategy, generates brandable domain candidates and scores them.
+        If checkAvailability is true, also checks GoDaddy for real-time availability.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HuntInput"
+      responses:
+        "200":
+          description: Hunt results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HuntResult"
+
+  /domains/{name}/availability:
+    get:
+      operationId: getDomainAvailability
+      tags: [domains]
+      summary: Check real-time availability for a single domain
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Availability info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainAvailability"
+
+  /domains/{name}/social:
+    get:
+      operationId: getSocialHandles
+      tags: [domains]
+      summary: Check matching social handle availability across X, Instagram, LinkedIn
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Social handle availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SocialHandles"
+
+  /domains/{name}/trademark:
+    get:
+      operationId: getTrademarkRisk
+      tags: [domains]
+      summary: Basic trademark conflict check
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trademark risk
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrademarkRisk"
+
+  /domains/{name}/details:
+    get:
+      operationId: getDomainDetails
+      tags: [domains]
+      summary: Aggregate validation report for one domain (availability + social + trademark + score)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Aggregate details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainDetails"
+
+  /saved:
+    get:
+      operationId: listSavedDomains
+      tags: [saved]
+      summary: List saved domains
+      responses:
+        "200":
+          description: Saved domains
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SavedDomain"
+    post:
+      operationId: saveDomain
+      tags: [saved]
+      summary: Save a domain to the shortlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveDomainInput"
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedDomain"
+
+  /saved/{id}:
+    delete:
+      operationId: deleteSavedDomain
+      tags: [saved]
+      summary: Remove a saved domain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Dashboard summary metrics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +223,331 @@ components:
       required:
         - status
 
+    Category:
+      type: string
+      enum: [ai, quantum, biotech, green_energy, space_tech]
+
+    Strategy:
+      type: string
+      enum: [brandable_cvcv, future_suffix, dictionary_hack, transliteration, four_letter]
+
+    TrendKeyword:
+      type: object
+      properties:
+        keyword:
+          type: string
+        weight:
+          type: number
+          description: 0..1 weight indicating trend strength
+        rationale:
+          type: string
+      required: [keyword, weight, rationale]
+
+    TrendBundle:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/Category"
+        generatedAt:
+          type: string
+          format: date-time
+        keywords:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendKeyword"
+        suffixes:
+          type: array
+          items:
+            type: string
+        prefixes:
+          type: array
+          items:
+            type: string
+      required: [category, generatedAt, keywords, suffixes, prefixes]
+
+    GenerateTrendsInput:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/Category"
+      required: [category]
+
+    HuntInput:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/Category"
+        strategy:
+          $ref: "#/components/schemas/Strategy"
+        count:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 30
+        tld:
+          type: string
+          default: "com"
+        checkAvailability:
+          type: boolean
+          default: true
+      required: [category, strategy]
+
+    ScoreBreakdown:
+      type: object
+      properties:
+        length:
+          type: number
+        tld:
+          type: number
+        trend:
+          type: number
+        phonetic:
+          type: number
+        memorability:
+          type: number
+        radioTest:
+          type: number
+      required: [length, tld, trend, phonetic, memorability, radioTest]
+
+    DomainCandidate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: SLD only, lowercase (e.g. "neuralq")
+        tld:
+          type: string
+        fqdn:
+          type: string
+          description: Fully-qualified e.g. "neuralq.com"
+        category:
+          $ref: "#/components/schemas/Category"
+        strategy:
+          $ref: "#/components/schemas/Strategy"
+        pattern:
+          type: string
+          description: e.g. "CVCV", "CVCVC", "CVCCV"
+        length:
+          type: integer
+        vowelConsonantBalance:
+          type: number
+          description: 0..100
+        memorabilityScore:
+          type: number
+          description: 0..100
+        radioTest:
+          type: boolean
+          description: Phone-spelling test pass/fail
+        valueScore:
+          type: number
+          description: Composite 0..100
+        scoreBreakdown:
+          $ref: "#/components/schemas/ScoreBreakdown"
+        available:
+          type: ["boolean", "null"]
+        listPrice:
+          type: ["number", "null"]
+          description: Listed price in USD (GoDaddy) when available
+        currency:
+          type: ["string", "null"]
+        rationale:
+          type: string
+          description: Short AI explanation of why this name is valuable
+      required:
+        - name
+        - tld
+        - fqdn
+        - category
+        - strategy
+        - pattern
+        - length
+        - vowelConsonantBalance
+        - memorabilityScore
+        - radioTest
+        - valueScore
+        - scoreBreakdown
+        - rationale
+
+    HuntResult:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/Category"
+        strategy:
+          $ref: "#/components/schemas/Strategy"
+        generatedAt:
+          type: string
+          format: date-time
+        elapsedMs:
+          type: integer
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainCandidate"
+      required: [category, strategy, generatedAt, elapsedMs, candidates]
+
+    DomainAvailability:
+      type: object
+      properties:
+        fqdn:
+          type: string
+        available:
+          type: ["boolean", "null"]
+        listPrice:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        period:
+          type: ["integer", "null"]
+        source:
+          type: string
+          description: "godaddy | error"
+        message:
+          type: ["string", "null"]
+      required: [fqdn, available, source]
+
+    SocialHandle:
+      type: object
+      properties:
+        platform:
+          type: string
+          enum: [x, instagram, linkedin]
+        handle:
+          type: string
+        available:
+          type: ["boolean", "null"]
+        url:
+          type: string
+      required: [platform, handle, available, url]
+
+    SocialHandles:
+      type: object
+      properties:
+        name:
+          type: string
+        handles:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialHandle"
+      required: [name, handles]
+
+    TrademarkRisk:
+      type: object
+      properties:
+        name:
+          type: string
+        risk:
+          type: string
+          enum: [low, medium, high]
+        matches:
+          type: array
+          items:
+            type: string
+        rationale:
+          type: string
+      required: [name, risk, matches, rationale]
+
+    DomainDetails:
+      type: object
+      properties:
+        candidate:
+          $ref: "#/components/schemas/DomainCandidate"
+        availability:
+          $ref: "#/components/schemas/DomainAvailability"
+        social:
+          $ref: "#/components/schemas/SocialHandles"
+        trademark:
+          $ref: "#/components/schemas/TrademarkRisk"
+      required: [candidate, availability, social, trademark]
+
+    SavedDomain:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        tld:
+          type: string
+        fqdn:
+          type: string
+        category:
+          $ref: "#/components/schemas/Category"
+        strategy:
+          $ref: "#/components/schemas/Strategy"
+        valueScore:
+          type: number
+        listPrice:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+        savedAt:
+          type: string
+          format: date-time
+      required: [id, name, tld, fqdn, category, strategy, valueScore, savedAt]
+
+    SaveDomainInput:
+      type: object
+      properties:
+        name:
+          type: string
+        tld:
+          type: string
+        category:
+          $ref: "#/components/schemas/Category"
+        strategy:
+          $ref: "#/components/schemas/Strategy"
+        valueScore:
+          type: number
+        listPrice:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+      required: [name, tld, category, strategy, valueScore]
+
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          $ref: "#/components/schemas/Category"
+        count:
+          type: integer
+        avgScore:
+          type: number
+      required: [category, count, avgScore]
+
+    StrategyCount:
+      type: object
+      properties:
+        strategy:
+          $ref: "#/components/schemas/Strategy"
+        count:
+          type: integer
+        avgScore:
+          type: number
+      required: [strategy, count, avgScore]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalSaved:
+          type: integer
+        avgScore:
+          type: number
+        topScore:
+          type: number
+        availableCount:
+          type: integer
+        byCategory:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+        byStrategy:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrategyCount"
+        topPicks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SavedDomain"
+      required: [totalSaved, avgScore, topScore, availableCount, byCategory, byStrategy, topPicks]
