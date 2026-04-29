@@ -10,11 +10,15 @@ export interface DnsCheckResult {
   checkedAt: string;
 }
 
-const DNS_TIMEOUT_MS = 4000;
+const DNS_TIMEOUT_MS = 4500;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("dns_timeout")), ms);
+    const t = setTimeout(() => {
+      const e = new Error("dns_timeout") as NodeJS.ErrnoException;
+      e.code = "ETIMEOUT";
+      reject(e);
+    }, ms);
     p.then(
       (v) => {
         clearTimeout(t);
@@ -78,24 +82,23 @@ export async function dnsAvailability(fqdn: string): Promise<DnsCheckResult> {
       }
       return { fqdn, signal: "unknown", evidence: "ENODATA", checkedAt };
     }
-    if (code === "ETIMEOUT" || code === "ESERVFAIL") {
+    if (code === "ETIMEOUT" || code === "ESERVFAIL" || code === "EREFUSED") {
       return { fqdn, signal: "unknown", evidence: code, checkedAt };
     }
     logger.debug({ fqdn, err }, "dns lookup error");
   }
 
+  // Final fallback: try A lookup. If it resolves → registered. If NXDOMAIN → available.
   try {
     const a = await withTimeout(dnsPromises.resolve4(fqdn), DNS_TIMEOUT_MS);
     if (Array.isArray(a) && a.length > 0) {
-      return {
-        fqdn,
-        signal: "registered",
-        evidence: `A: ${a[0]}`,
-        checkedAt,
-      };
+      return { fqdn, signal: "registered", evidence: `A: ${a[0]}`, checkedAt };
     }
-  } catch {
-    // fall through
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code ?? "";
+    if (code === "ENOTFOUND") {
+      return { fqdn, signal: "available", evidence: "NXDOMAIN (A)", checkedAt };
+    }
   }
 
   return { fqdn, signal: "unknown", evidence: "no records", checkedAt };
@@ -103,7 +106,7 @@ export async function dnsAvailability(fqdn: string): Promise<DnsCheckResult> {
 
 export async function dnsAvailabilityBatch(
   fqdns: string[],
-  concurrency = 12,
+  concurrency = 64,
 ): Promise<DnsCheckResult[]> {
   const out: DnsCheckResult[] = new Array(fqdns.length);
   let cursor = 0;
@@ -112,7 +115,16 @@ export async function dnsAvailabilityBatch(
       const idx = cursor++;
       if (idx >= fqdns.length) return;
       const fqdn = fqdns[idx]!;
-      out[idx] = await dnsAvailability(fqdn);
+      try {
+        out[idx] = await dnsAvailability(fqdn);
+      } catch {
+        out[idx] = {
+          fqdn,
+          signal: "unknown",
+          evidence: "worker_error",
+          checkedAt: new Date().toISOString(),
+        };
+      }
     }
   }
   await Promise.all(
@@ -120,3 +132,5 @@ export async function dnsAvailabilityBatch(
   );
   return out;
 }
+
+export { dnsPromises };

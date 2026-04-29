@@ -1,10 +1,10 @@
 import { EventEmitter } from "events";
 import { sql } from "drizzle-orm";
 import { db, discoveriesTable, dnsCacheTable } from "@workspace/db";
-import { generate } from "./generators";
+import { generate, ALL_STRATEGIES } from "./generators";
 import { scoreCandidate } from "./scoring";
 import { generateTrendsForCategory, buildRationale } from "./groq";
-import { dnsAvailability, type DnsCheckResult } from "./availability";
+import { dnsAvailabilityBatch, type DnsCheckResult } from "./availability";
 import { logger } from "./logger";
 
 const CATEGORIES = [
@@ -15,13 +15,7 @@ const CATEGORIES = [
   "space_tech",
 ] as const;
 
-const STRATEGIES = [
-  "brandable_cvcv",
-  "future_suffix",
-  "dictionary_hack",
-  "transliteration",
-  "four_letter",
-] as const;
+const STRATEGIES = ALL_STRATEGIES;
 
 type Category = (typeof CATEGORIES)[number];
 type Strategy = (typeof STRATEGIES)[number];
@@ -67,13 +61,15 @@ export interface HunterState {
   starvationStreak: number;
   perStrategy: Record<string, PerBucketStats>;
   perCategory: Record<string, PerBucketStats>;
-  recentNamesSize: number;
+  everSearchedSize: number;
+  checksPerSecond: number;
+  batchSize: number;
+  concurrency: number;
 }
 
-const RING_SIZE = 200;
-const RECENT_NAMES_PER_BUCKET = 600;
-const TREND_LOG_INTERVAL_MS = 5 * 60 * 1000;
-const REPROBE_SUPPRESS_MS = 30 * 60 * 1000;
+const RING_SIZE = 250;
+const DEFAULT_BATCH_SIZE = 300;
+const DEFAULT_CONCURRENCY = 64;
 
 class Hunter extends EventEmitter {
   private state: HunterState = {
@@ -89,12 +85,15 @@ class Hunter extends EventEmitter {
     totalDuplicateSkips: 0,
     currentCategory: null,
     currentStrategy: null,
-    minValueScore: 55,
-    effectiveMinScore: 55,
+    minValueScore: 50,
+    effectiveMinScore: 50,
     starvationStreak: 0,
     perStrategy: {},
     perCategory: {},
-    recentNamesSize: 0,
+    everSearchedSize: 0,
+    checksPerSecond: 0,
+    batchSize: DEFAULT_BATCH_SIZE,
+    concurrency: DEFAULT_CONCURRENCY,
   };
   private stopRequested = false;
   private trendCache = new Map<
@@ -105,10 +104,13 @@ class Hunter extends EventEmitter {
   private nextEventId = 1;
   private ring: HunterEvent[] = [];
 
-  // Per (category|strategy) memory — names we've already generated, for variety.
-  private recentNames = new Map<string, string[]>();
-  // Names recently emitted as "registered" — suppress duplicate UI spam.
-  private recentRegisteredEmits = new Map<string, number>();
+  // PERMANENT search history — every fqdn ever DNS-checked.
+  // Loaded from dns_cache on startup, kept in sync as we run.
+  private everSearched = new Set<string>();
+  private historyLoaded = false;
+
+  // Throughput tracking — checks per second over a 5s sliding window.
+  private throughputWindow: { ts: number; checks: number }[] = [];
 
   private bumpStat(
     bucket: "perStrategy" | "perCategory",
@@ -122,20 +124,20 @@ class Hunter extends EventEmitter {
     map[key] = cur;
   }
 
-  private getRecent(key: string): string[] {
-    return this.recentNames.get(key) ?? [];
-  }
-
-  private addRecent(key: string, names: string[]) {
-    const cur = this.recentNames.get(key) ?? [];
-    const merged = [...cur, ...names];
-    if (merged.length > RECENT_NAMES_PER_BUCKET) {
-      merged.splice(0, merged.length - RECENT_NAMES_PER_BUCKET);
+  async loadHistory() {
+    if (this.historyLoaded) return;
+    try {
+      const rows = await db.select({ fqdn: dnsCacheTable.fqdn }).from(dnsCacheTable);
+      for (const r of rows) this.everSearched.add(r.fqdn);
+      this.state.everSearchedSize = this.everSearched.size;
+      this.historyLoaded = true;
+      logger.info(
+        { historySize: this.everSearched.size },
+        "Hunter history loaded into memory",
+      );
+    } catch (err) {
+      logger.error({ err }, "Failed to load DNS history");
     }
-    this.recentNames.set(key, merged);
-    let total = 0;
-    for (const v of this.recentNames.values()) total += v.length;
-    this.state.recentNamesSize = total;
   }
 
   private emitEvent(ev: Omit<HunterEvent, "id" | "ts">) {
@@ -154,6 +156,7 @@ class Hunter extends EventEmitter {
   }
 
   getState(): HunterState {
+    this.recomputeThroughput();
     return { ...this.state };
   }
 
@@ -175,10 +178,13 @@ class Hunter extends EventEmitter {
     return {
       perStrategy: strategies,
       perCategory: categories,
-      recentNamesMemory: this.state.recentNamesSize,
+      everSearchedSize: this.everSearched.size,
       effectiveMinScore: this.state.effectiveMinScore,
       requestedMinScore: this.state.minValueScore,
       starvationStreak: this.state.starvationStreak,
+      checksPerSecond: this.state.checksPerSecond,
+      batchSize: this.state.batchSize,
+      concurrency: this.state.concurrency,
     };
   }
 
@@ -189,17 +195,26 @@ class Hunter extends EventEmitter {
     this.state.starvationStreak = 0;
   }
 
-  start(opts?: { minValueScore?: number }) {
-    if (this.state.running) return;
-    if (typeof opts?.minValueScore === "number") {
-      this.setMinScore(opts.minValueScore);
+  setSpeed(opts: { batchSize?: number; concurrency?: number }) {
+    if (typeof opts.batchSize === "number") {
+      this.state.batchSize = Math.max(50, Math.min(2000, opts.batchSize));
     }
+    if (typeof opts.concurrency === "number") {
+      this.state.concurrency = Math.max(10, Math.min(400, opts.concurrency));
+    }
+  }
+
+  async start(opts?: { minValueScore?: number; batchSize?: number; concurrency?: number }) {
+    if (this.state.running) return;
+    await this.loadHistory();
+    if (typeof opts?.minValueScore === "number") this.setMinScore(opts.minValueScore);
+    if (opts?.batchSize || opts?.concurrency) this.setSpeed(opts);
     this.state.running = true;
     this.state.startedAt = new Date().toISOString();
     this.stopRequested = false;
     this.emitEvent({
       kind: "info",
-      message: `Hunter started — min score ${this.state.minValueScore}, recent-name memory ${this.state.recentNamesSize}`,
+      message: `Hunter armed — ${this.everSearched.size.toLocaleString()} names already in history. batch=${this.state.batchSize} concurrency=${this.state.concurrency} min=${this.state.minValueScore}`,
     });
     void this.loop();
   }
@@ -211,13 +226,20 @@ class Hunter extends EventEmitter {
   }
 
   reset() {
-    this.recentNames.clear();
-    this.recentRegisteredEmits.clear();
+    // Note: this does NOT clear everSearched (permanent history). Only resets stats counters.
+    this.state.totalGenerated = 0;
+    this.state.totalScoreFiltered = 0;
+    this.state.totalChecked = 0;
+    this.state.totalRegistered = 0;
+    this.state.totalDiscoveries = 0;
+    this.state.totalUnknown = 0;
+    this.state.totalDuplicateSkips = 0;
+    this.state.perStrategy = {};
+    this.state.perCategory = {};
     this.trendLastLoggedAt.clear();
-    this.state.recentNamesSize = 0;
     this.emitEvent({
       kind: "info",
-      message: "Generator memory cleared — fresh exploration",
+      message: `Stats reset. Permanent history kept (${this.everSearched.size.toLocaleString()} names will never be re-checked).`,
     });
   }
 
@@ -233,42 +255,51 @@ class Hunter extends EventEmitter {
     return keywords;
   }
 
-  private async cachedDns(fqdn: string): Promise<DnsCheckResult & { fromCache: boolean }> {
-    const rows = await db
-      .select()
-      .from(dnsCacheTable)
-      .where(sql`${dnsCacheTable.fqdn} = ${fqdn}`);
-    const cached = rows[0];
-    if (cached) {
-      const ageMs = Date.now() - new Date(cached.checkedAt).getTime();
-      if (ageMs < 6 * 60 * 60 * 1000) {
-        return {
-          fqdn,
-          signal: cached.signal as DnsCheckResult["signal"],
-          evidence: cached.evidence,
-          checkedAt: new Date(cached.checkedAt).toISOString(),
-          fromCache: true,
-        };
-      }
+  private recordThroughput(checks: number) {
+    const now = Date.now();
+    this.throughputWindow.push({ ts: now, checks });
+    const cutoff = now - 5000;
+    while (this.throughputWindow.length > 0 && this.throughputWindow[0]!.ts < cutoff) {
+      this.throughputWindow.shift();
     }
-    const fresh = await dnsAvailability(fqdn);
-    await db
-      .insert(dnsCacheTable)
-      .values({
-        fqdn,
-        signal: fresh.signal,
-        evidence: fresh.evidence,
-        checkedAt: new Date(fresh.checkedAt),
-      })
-      .onConflictDoUpdate({
-        target: dnsCacheTable.fqdn,
-        set: {
-          signal: fresh.signal,
-          evidence: fresh.evidence,
-          checkedAt: new Date(fresh.checkedAt),
-        },
-      });
-    return { ...fresh, fromCache: false };
+  }
+
+  private recomputeThroughput() {
+    const now = Date.now();
+    const cutoff = now - 5000;
+    while (this.throughputWindow.length > 0 && this.throughputWindow[0]!.ts < cutoff) {
+      this.throughputWindow.shift();
+    }
+    const total = this.throughputWindow.reduce((s, w) => s + w.checks, 0);
+    const span = Math.max(1, (now - (this.throughputWindow[0]?.ts ?? now)) / 1000);
+    this.state.checksPerSecond = Math.round(total / span);
+  }
+
+  private async bulkCacheUpsert(results: DnsCheckResult[]) {
+    if (results.length === 0) return;
+    // Chunk to keep parameter count safe (1000 params per chunk).
+    const CHUNK = 250;
+    for (let i = 0; i < results.length; i += CHUNK) {
+      const slice = results.slice(i, i + CHUNK);
+      await db
+        .insert(dnsCacheTable)
+        .values(
+          slice.map((r) => ({
+            fqdn: r.fqdn,
+            signal: r.signal,
+            evidence: r.evidence,
+            checkedAt: new Date(r.checkedAt),
+          })),
+        )
+        .onConflictDoUpdate({
+          target: dnsCacheTable.fqdn,
+          set: {
+            signal: sql`excluded.signal`,
+            evidence: sql`excluded.evidence`,
+            checkedAt: sql`excluded.checked_at`,
+          },
+        });
+    }
   }
 
   private async runCycle() {
@@ -280,192 +311,220 @@ class Hunter extends EventEmitter {
     const strategy = STRATEGIES[strategyIdx]!;
     this.state.currentCategory = category;
     this.state.currentStrategy = strategy;
-    const bucketKey = `${category}|${strategy}`;
-
-    this.emitEvent({
-      kind: "phase",
-      message: `Cycle #${this.state.cycle}: ${category} × ${strategy}`,
-      data: { cycle: this.state.cycle, category, strategy },
-    });
 
     const trends = await this.getTrends(category);
 
-    // Emit trend keywords only first time per category, or every 5 minutes per category.
     const lastTrendLog = this.trendLastLoggedAt.get(category) ?? 0;
-    if (Date.now() - lastTrendLog > TREND_LOG_INTERVAL_MS) {
+    if (Date.now() - lastTrendLog > 5 * 60 * 1000) {
       this.trendLastLoggedAt.set(category, Date.now());
       this.emitEvent({
         kind: "info",
-        message: `[${category}] trend keywords refreshed: ${trends.slice(0, 5).join(", ")}`,
-        data: { category, trends: trends.slice(0, 8) },
+        message: `[${category}] trend keywords: ${trends.slice(0, 5).join(", ")}`,
       });
     }
 
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-    const batchSize = 30;
-    const exclude = new Set(this.getRecent(bucketKey));
-    const requested = batchSize;
-    const names = generate(strategy, category, trends, requested, seed, exclude);
-    const dupesSkipped = Math.max(0, requested - names.length);
-    if (dupesSkipped > 0) this.state.totalDuplicateSkips += dupesSkipped;
-    this.addRecent(bucketKey, names);
-    this.state.totalGenerated += names.length;
-    this.bumpStat("perStrategy", strategy, "generated", names.length);
-    this.bumpStat("perCategory", category, "generated", names.length);
+    const requested = this.state.batchSize;
+    const fqdnsExclude = new Set<string>();
+    const namesGenerated = generate(strategy, category, trends, requested, seed);
+    const dupesPreFilter = namesGenerated.length === 0 ? 0 : 0;
 
-    if (names.length === 0) {
+    // Filter against PERMANENT history (fqdn = name + ".com").
+    const freshNames: string[] = [];
+    let historySkips = 0;
+    for (const name of namesGenerated) {
+      const fqdn = `${name}.com`;
+      if (this.everSearched.has(fqdn) || fqdnsExclude.has(fqdn)) {
+        historySkips++;
+        continue;
+      }
+      fqdnsExclude.add(fqdn);
+      freshNames.push(name);
+    }
+    this.state.totalDuplicateSkips += historySkips + dupesPreFilter;
+    this.state.totalGenerated += freshNames.length;
+    this.bumpStat("perStrategy", strategy, "generated", freshNames.length);
+    this.bumpStat("perCategory", category, "generated", freshNames.length);
+
+    if (freshNames.length === 0) {
       this.emitEvent({
         kind: "info",
-        message: `[${bucketKey}] generator exhausted — name pool saturated, will retry after rotation`,
+        message: `[${category}/${strategy}] generator exhausted vs history (${historySkips} dupes blocked) — rotating`,
       });
       return;
     }
 
-    const scored = names.map((name) => {
+    // Score everything, take those above effective threshold.
+    const scored = freshNames.map((name) => {
       const s = scoreCandidate({ name, tld: "com", trendKeywords: trends });
       return { name, score: s };
     });
     scored.sort((a, b) => b.score.valueScore - a.score.valueScore);
-    const topScores = scored.slice(0, 5).map((s) => `${s.name}=${s.score.valueScore}`);
-    const bottomScores = scored
-      .slice(-3)
-      .map((s) => `${s.name}=${s.score.valueScore}`);
 
-    const worthChecking = scored.filter(
+    const passing = scored.filter(
       (s) => s.score.valueScore >= this.state.effectiveMinScore,
     );
-    const filteredCount = scored.length - worthChecking.length;
+    const filteredCount = scored.length - passing.length;
     this.state.totalScoreFiltered += filteredCount;
 
-    this.emitEvent({
-      kind: "generated",
-      message: `Generated ${names.length} fresh${dupesSkipped ? ` (skipped ${dupesSkipped} dupes)` : ""}, ${worthChecking.length} pass score≥${this.state.effectiveMinScore} | top: ${topScores.slice(0, 3).join(", ")}`,
-      data: {
-        cycle: this.state.cycle,
-        category,
-        strategy,
-        generated: names.length,
-        passed: worthChecking.length,
-        filtered: filteredCount,
-        dupesSkipped,
-        topPassed: scored
-          .filter((s) => s.score.valueScore >= this.state.effectiveMinScore)
-          .slice(0, 5)
-          .map((s) => ({ name: s.name, score: s.score.valueScore })),
-        topRejected: scored
-          .filter((s) => s.score.valueScore < this.state.effectiveMinScore)
-          .slice(0, 5)
-          .map((s) => ({ name: s.name, score: s.score.valueScore })),
-        bottom: bottomScores,
-      },
-    });
-
-    if (worthChecking.length === 0) {
+    if (passing.length === 0) {
       this.state.starvationStreak++;
-      // Auto-relax: if 8 cycles in a row produce nothing, lower the bar by 5.
-      if (this.state.starvationStreak >= 8 && this.state.effectiveMinScore > 35) {
-        const newScore = Math.max(35, this.state.effectiveMinScore - 5);
+      this.emitEvent({
+        kind: "phase",
+        message: `Cycle #${this.state.cycle} [${category}/${strategy}]: ${freshNames.length} fresh, 0 above ${this.state.effectiveMinScore}, top=${scored[0]?.score.valueScore ?? 0} (skipped ${historySkips} known)`,
+        data: {
+          cycle: this.state.cycle,
+          category,
+          strategy,
+          generated: freshNames.length,
+          historySkips,
+          topRejected: scored
+            .slice(0, 3)
+            .map((s) => ({ name: s.name, score: s.score.valueScore })),
+        },
+      });
+      if (this.state.starvationStreak >= 8 && this.state.effectiveMinScore > 30) {
+        const newScore = Math.max(30, this.state.effectiveMinScore - 5);
         this.state.effectiveMinScore = newScore;
         this.state.starvationStreak = 0;
         this.emitEvent({
           kind: "info",
-          message: `Auto-relaxed score gate to ≥${newScore} (8 cycles starved). Slide minScore manually anytime.`,
+          message: `Auto-relaxed score gate to ≥${newScore}`,
         });
       }
       return;
-    } else {
-      this.state.starvationStreak = 0;
+    }
+    this.state.starvationStreak = 0;
+
+    this.emitEvent({
+      kind: "phase",
+      message: `Cycle #${this.state.cycle} [${category}/${strategy}]: probing ${passing.length}/${freshNames.length} (top: ${passing[0]?.name}=${passing[0]?.score.valueScore}) — ${historySkips} known skipped`,
+      data: {
+        cycle: this.state.cycle,
+        category,
+        strategy,
+        probing: passing.length,
+        generated: freshNames.length,
+        historySkips,
+        topPassed: passing
+          .slice(0, 5)
+          .map((s) => ({ name: s.name, score: s.score.valueScore })),
+      },
+    });
+
+    // Massive parallel DNS lookup.
+    const fqdns = passing.map((p) => `${p.name}.com`);
+    const t0 = Date.now();
+    const results = await dnsAvailabilityBatch(fqdns, this.state.concurrency);
+    const elapsed = (Date.now() - t0) / 1000;
+    const ratePerSec = elapsed > 0 ? Math.round(fqdns.length / elapsed) : fqdns.length;
+    this.recordThroughput(fqdns.length);
+
+    // Update history immediately for ALL results.
+    for (const r of results) this.everSearched.add(r.fqdn);
+    this.state.everSearchedSize = this.everSearched.size;
+    this.state.totalChecked += results.length;
+    this.bumpStat("perStrategy", strategy, "checked", results.length);
+    this.bumpStat("perCategory", category, "checked", results.length);
+
+    // Bulk persist to dns_cache.
+    try {
+      await this.bulkCacheUpsert(results);
+    } catch (err) {
+      logger.error({ err }, "Bulk dns_cache upsert failed");
     }
 
-    for (const { name, score } of worthChecking) {
-      if (this.stopRequested) return;
-      const fqdn = `${name}.com`;
-      const dns = await this.cachedDns(fqdn);
-      this.state.totalChecked++;
-      this.bumpStat("perStrategy", strategy, "checked");
-      this.bumpStat("perCategory", category, "checked");
-
-      if (dns.signal === "registered") {
-        this.state.totalRegistered++;
-        // Suppress duplicate "registered" UI spam for the same name within 30 minutes.
-        const lastEmit = this.recentRegisteredEmits.get(fqdn) ?? 0;
-        if (Date.now() - lastEmit > REPROBE_SUPPRESS_MS) {
-          this.recentRegisteredEmits.set(fqdn, Date.now());
-          this.emitEvent({
-            kind: "registered",
-            message: `${fqdn} taken — ${dns.evidence}${dns.fromCache ? " (cached)" : ""}`,
-            data: { fqdn, evidence: dns.evidence, score: score.valueScore },
-          });
-        }
-        continue;
+    let registered = 0;
+    let unknown = 0;
+    const diamonds: { name: string; fqdn: string; result: DnsCheckResult; score: ReturnType<typeof scoreCandidate> }[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i]!;
+      const p = passing[i]!;
+      if (r.signal === "registered") registered++;
+      else if (r.signal === "unknown") unknown++;
+      else if (r.signal === "available") {
+        diamonds.push({ name: p.name, fqdn: r.fqdn, result: r, score: p.score });
       }
-      if (dns.signal === "unknown") {
-        this.state.totalUnknown++;
-        this.emitEvent({
-          kind: "skipped",
-          message: `${fqdn} inconclusive — ${dns.evidence}`,
-          data: { fqdn, evidence: dns.evidence },
-        });
-        continue;
-      }
+    }
+    this.state.totalRegistered += registered;
+    this.state.totalUnknown += unknown;
 
-      this.emitEvent({
-        kind: "checking",
-        message: `${fqdn} passed score ${score.valueScore} → DNS check`,
-        data: { fqdn, score: score.valueScore, breakdown: score.breakdown },
-      });
-
-      const rationale = buildRationale({
-        name,
+    // Insert diamonds in bulk.
+    if (diamonds.length > 0) {
+      const rows = diamonds.map((d) => ({
+        fqdn: d.fqdn,
+        name: d.name,
         tld: "com",
         category,
         strategy,
-        pattern: score.pattern,
-        valueScore: score.valueScore,
-      });
-
+        pattern: d.score.pattern,
+        length: d.name.length,
+        valueScore: String(d.score.valueScore),
+        memorability: d.score.memorability,
+        radioTest: d.score.radioTest ? 1 : 0,
+        rationale: buildRationale({
+          name: d.name,
+          tld: "com",
+          category,
+          strategy,
+          pattern: d.score.pattern,
+          valueScore: d.score.valueScore,
+        }),
+        dnsEvidence: d.result.evidence,
+      }));
       try {
         const inserted = await db
           .insert(discoveriesTable)
-          .values({
-            fqdn,
-            name,
-            tld: "com",
-            category,
-            strategy,
-            pattern: score.pattern,
-            length: name.length,
-            valueScore: String(score.valueScore),
-            memorability: score.memorability,
-            radioTest: score.radioTest ? 1 : 0,
-            rationale,
-            dnsEvidence: dns.evidence,
-          })
+          .values(rows)
           .onConflictDoNothing()
-          .returning();
-        if (inserted.length > 0) {
-          this.state.totalDiscoveries++;
-          this.bumpStat("perStrategy", strategy, "diamonds");
-          this.bumpStat("perCategory", category, "diamonds");
+          .returning({ fqdn: discoveriesTable.fqdn });
+        const insertedSet = new Set(inserted.map((r) => r.fqdn));
+        const newCount = insertedSet.size;
+        this.state.totalDiscoveries += newCount;
+        this.bumpStat("perStrategy", strategy, "diamonds", newCount);
+        this.bumpStat("perCategory", category, "diamonds", newCount);
+
+        // Emit individual events for newly-saved diamonds (capped to top 8).
+        const newDiamonds = diamonds.filter((d) => insertedSet.has(d.fqdn));
+        for (const d of newDiamonds.slice(0, 8)) {
           this.emitEvent({
             kind: "discovery",
-            message: `DIAMOND: ${fqdn} (score ${score.valueScore}, ${category}/${strategy})`,
+            message: `DIAMOND: ${d.fqdn} (score ${d.score.valueScore}, ${category}/${strategy})`,
             data: {
-              fqdn,
+              fqdn: d.fqdn,
               category,
               strategy,
-              valueScore: score.valueScore,
-              pattern: score.pattern,
-              evidence: dns.evidence,
-              rationale,
-              breakdown: score.breakdown,
+              valueScore: d.score.valueScore,
+              pattern: d.score.pattern,
+              evidence: d.result.evidence,
+              breakdown: d.score.breakdown,
             },
           });
         }
+        if (newDiamonds.length > 8) {
+          this.emitEvent({
+            kind: "discovery",
+            message: `+${newDiamonds.length - 8} more diamonds saved this cycle`,
+          });
+        }
       } catch (err) {
-        logger.error({ err, fqdn }, "Failed to insert discovery");
+        logger.error({ err, count: rows.length }, "Bulk discovery insert failed");
       }
     }
+
+    // Per-cycle summary line (one event, not per-name).
+    this.emitEvent({
+      kind: "generated",
+      message: `→ ${results.length} probed @ ${ratePerSec}/sec | taken ${registered} · unknown ${unknown} · diamonds ${diamonds.length}`,
+      data: {
+        probed: results.length,
+        registered,
+        unknown,
+        diamonds: diamonds.length,
+        ratePerSec,
+        elapsed,
+      },
+    });
   }
 
   private async loop() {
@@ -478,8 +537,10 @@ class Hunter extends EventEmitter {
           kind: "error",
           message: `Cycle error: ${(err as Error).message}`,
         });
+        await new Promise((r) => setTimeout(r, 1000));
       }
-      await new Promise((r) => setTimeout(r, 1500));
+      // Tiny pause to yield event loop and let SSE clients catch up.
+      await new Promise((r) => setImmediate(r));
     }
     this.state.running = false;
     this.state.startedAt = null;

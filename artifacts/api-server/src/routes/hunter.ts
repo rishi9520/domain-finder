@@ -31,12 +31,26 @@ router.get("/hunter/status", (_req, res): void => {
   res.json(hunter.getState());
 });
 
-router.post("/hunter/start", (req, res): void => {
+router.post("/hunter/start", async (req, res): Promise<void> => {
   const minValueScore =
     typeof req.body?.minValueScore === "number"
       ? req.body.minValueScore
       : undefined;
-  hunter.start({ minValueScore });
+  const batchSize =
+    typeof req.body?.batchSize === "number" ? req.body.batchSize : undefined;
+  const concurrency =
+    typeof req.body?.concurrency === "number" ? req.body.concurrency : undefined;
+  await hunter.start({ minValueScore, batchSize, concurrency });
+  res.json(hunter.getState());
+});
+
+router.post("/hunter/speed", (req, res): void => {
+  hunter.setSpeed({
+    batchSize:
+      typeof req.body?.batchSize === "number" ? req.body.batchSize : undefined,
+    concurrency:
+      typeof req.body?.concurrency === "number" ? req.body.concurrency : undefined,
+  });
   res.json(hunter.getState());
 });
 

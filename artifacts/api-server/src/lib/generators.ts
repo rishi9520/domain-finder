@@ -256,6 +256,209 @@ export function generateFourLetter(
   return Array.from(out);
 }
 
+const PREMIUM_PREFIXES = [
+  "neo",
+  "meta",
+  "syn",
+  "omni",
+  "hyper",
+  "ultra",
+  "para",
+  "proto",
+  "trans",
+  "infra",
+  "exo",
+  "endo",
+  "cyber",
+  "bio",
+  "geo",
+  "helio",
+  "lumin",
+  "vivo",
+  "auro",
+  "kine",
+];
+
+const PREMIUM_ROOTS = [
+  "core",
+  "labs",
+  "node",
+  "wave",
+  "loop",
+  "flux",
+  "form",
+  "stack",
+  "grid",
+  "pulse",
+  "field",
+  "mesh",
+  "cell",
+  "byte",
+  "sense",
+  "cast",
+  "scope",
+  "tide",
+  "spark",
+  "drift",
+  "shift",
+  "axis",
+  "orbit",
+  "vector",
+];
+
+const COLOR_TECH = [
+  "lumi",
+  "vivid",
+  "prism",
+  "aqua",
+  "ember",
+  "azure",
+  "indigo",
+  "amber",
+  "ivory",
+  "obsidian",
+  "neon",
+  "violet",
+  "crimson",
+  "ochre",
+  "saffron",
+];
+
+const SHORT_TECH_SUFFIX = [
+  "ly",
+  "io",
+  "ai",
+  "ix",
+  "xa",
+  "ox",
+  "us",
+  "or",
+  "yx",
+  "el",
+  "an",
+  "ex",
+];
+
+export function generatePrefixRoot(count: number, seed = Date.now()): string[] {
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 30) {
+    attempts++;
+    const p = pick(PREMIUM_PREFIXES, rng);
+    const r = pick(PREMIUM_ROOTS, rng);
+    const candidate = (p + r).toLowerCase();
+    if (
+      candidate.length >= 5 &&
+      candidate.length <= 11 &&
+      !hasAwkwardCluster(candidate) &&
+      isClean(candidate)
+    )
+      out.add(candidate);
+  }
+  return Array.from(out);
+}
+
+export function generateColorTech(count: number, seed = Date.now()): string[] {
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 30) {
+    attempts++;
+    const c = pick(COLOR_TECH, rng);
+    const r = pick(PREMIUM_ROOTS, rng);
+    const candidate = (c + r).toLowerCase();
+    if (
+      candidate.length >= 5 &&
+      candidate.length <= 11 &&
+      !hasAwkwardCluster(candidate) &&
+      isClean(candidate)
+    )
+      out.add(candidate);
+  }
+  return Array.from(out);
+}
+
+export function generateVowelStart(count: number, seed = Date.now()): string[] {
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 30) {
+    attempts++;
+    const len = 5 + Math.floor(rng() * 3); // 5..7
+    let s = pick(VOWELS_LIST, rng);
+    for (let i = 1; i < len; i++) {
+      s += isVowel(s[s.length - 1] ?? "")
+        ? pick(PRIMARY_CONS, rng)
+        : pick(VOWELS_LIST.concat(PRIMARY_CONS), rng);
+    }
+    if (!hasAwkwardCluster(s) && isClean(s)) out.add(s);
+  }
+  return Array.from(out);
+}
+
+export function generatePortmanteau(
+  trendKeywords: string[],
+  count: number,
+  seed = Date.now(),
+): string[] {
+  if (trendKeywords.length < 2) return [];
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 30) {
+    attempts++;
+    const a = pick(trendKeywords, rng).toLowerCase();
+    const b = pick(trendKeywords, rng).toLowerCase();
+    if (a === b) continue;
+    const splitA = 1 + Math.floor(rng() * Math.max(1, a.length - 1));
+    const splitB = 1 + Math.floor(rng() * Math.max(1, b.length - 1));
+    const candidate = (a.slice(0, splitA) + b.slice(splitB)).toLowerCase();
+    if (
+      candidate.length >= 5 &&
+      candidate.length <= 10 &&
+      !hasAwkwardCluster(candidate) &&
+      isClean(candidate) &&
+      /^[a-z]+$/.test(candidate)
+    )
+      out.add(candidate);
+  }
+  return Array.from(out);
+}
+
+export function generateShortSuffix(count: number, seed = Date.now()): string[] {
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 30) {
+    attempts++;
+    const root = pick(PREMIUM_ROOTS.concat(COLOR_TECH), rng);
+    const suf = pick(SHORT_TECH_SUFFIX, rng);
+    const candidate = (root + suf).toLowerCase();
+    if (
+      candidate.length >= 5 &&
+      candidate.length <= 9 &&
+      !hasAwkwardCluster(candidate) &&
+      isClean(candidate)
+    )
+      out.add(candidate);
+  }
+  return Array.from(out);
+}
+
+export const ALL_STRATEGIES = [
+  "brandable_cvcv",
+  "future_suffix",
+  "dictionary_hack",
+  "transliteration",
+  "four_letter",
+  "prefix_root",
+  "color_tech",
+  "vowel_start",
+  "portmanteau",
+  "short_suffix",
+] as const;
+
 export function generate(
   strategy: string,
   category: string,
@@ -264,8 +467,8 @@ export function generate(
   seed = Date.now(),
   excludeNames?: Set<string>,
 ): string[] {
-  // Oversample 4x and filter against excludeNames so we always get fresh names.
-  const oversample = excludeNames ? count * 4 : count;
+  // Oversample 6x and filter against excludeNames so we always get fresh names.
+  const oversample = excludeNames ? count * 6 : count;
   let raw: string[];
   switch (strategy) {
     case "brandable_cvcv":
@@ -282,6 +485,21 @@ export function generate(
       break;
     case "four_letter":
       raw = generateFourLetter(oversample, seed);
+      break;
+    case "prefix_root":
+      raw = generatePrefixRoot(oversample, seed);
+      break;
+    case "color_tech":
+      raw = generateColorTech(oversample, seed);
+      break;
+    case "vowel_start":
+      raw = generateVowelStart(oversample, seed);
+      break;
+    case "portmanteau":
+      raw = generatePortmanteau(trendKeywords, oversample, seed);
+      break;
+    case "short_suffix":
+      raw = generateShortSuffix(oversample, seed);
       break;
     default:
       raw = generateBrandableCVCV(oversample, seed);

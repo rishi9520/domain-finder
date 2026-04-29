@@ -432,7 +432,13 @@ export function Live() {
   const totalRegistered = state?.totalRegistered ?? 0;
   const totalDiscoveries = state?.totalDiscoveries ?? 0;
   const totalDuplicateSkips = state?.totalDuplicateSkips ?? 0;
-  const recentMemory = state?.recentNamesSize ?? 0;
+  const recentMemory =
+    (state as { everSearchedSize?: number; recentNamesSize?: number } | null)
+      ?.everSearchedSize ??
+    state?.recentNamesSize ??
+    0;
+  const checksPerSecond =
+    (state as { checksPerSecond?: number } | null)?.checksPerSecond ?? 0;
   const effectiveMinScore = state?.effectiveMinScore ?? minScore;
   const starvation = state?.starvationStreak ?? 0;
 
@@ -549,7 +555,7 @@ export function Live() {
         <StatCard label="DNS checked" value={String(totalChecked)} accent="cyan" />
         <StatCard label="Already taken" value={String(totalRegistered)} accent="rose" />
         <StatCard label="Diamonds" value={String(totalDiscoveries)} accent="emerald" subtitle={`${hitRate}% hit`} />
-        <StatCard label="Dupes blocked" value={String(totalDuplicateSkips)} accent="amber" subtitle={`mem ${recentMemory}`} />
+        <StatCard label="Dupes blocked" value={String(totalDuplicateSkips)} accent="amber" subtitle={`history ${recentMemory.toLocaleString()} · ${checksPerSecond}/sec`} />
       </div>
 
       {state?.currentCategory && state.currentStrategy && running && (
