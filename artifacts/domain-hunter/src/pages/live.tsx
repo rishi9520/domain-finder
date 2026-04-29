@@ -439,6 +439,17 @@ export function Live() {
     0;
   const checksPerSecond =
     (state as { checksPerSecond?: number } | null)?.checksPerSecond ?? 0;
+  const rdapVerified =
+    (state as { totalRdapVerified?: number } | null)?.totalRdapVerified ?? 0;
+  const rdapFalsePositives =
+    (state as { totalRdapFalsePositives?: number } | null)
+      ?.totalRdapFalsePositives ?? 0;
+  const cleanupRunning =
+    (state as { cleanupRunning?: boolean } | null)?.cleanupRunning ?? false;
+  const cleanupChecked =
+    (state as { cleanupChecked?: number } | null)?.cleanupChecked ?? 0;
+  const cleanupRemoved =
+    (state as { cleanupRemoved?: number } | null)?.cleanupRemoved ?? 0;
   const effectiveMinScore = state?.effectiveMinScore ?? minScore;
   const starvation = state?.starvationStreak ?? 0;
 
@@ -547,16 +558,37 @@ export function Live() {
 
       <HowItWorks />
 
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-8 mb-6">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-9 mb-6">
         <StatCard label="Status" value={running ? "RUN" : "IDLE"} accent={running ? "primary" : "muted"} />
         <StatCard label="Cycle" value={String(cycle)} />
         <StatCard label="Generated" value={String(totalGenerated)} />
         <StatCard label="Score-filtered" value={String(totalScoreFiltered)} accent="muted" subtitle="below min" />
         <StatCard label="DNS checked" value={String(totalChecked)} accent="cyan" />
         <StatCard label="Already taken" value={String(totalRegistered)} accent="rose" />
-        <StatCard label="Diamonds" value={String(totalDiscoveries)} accent="emerald" subtitle={`${hitRate}% hit`} />
+        <StatCard label="Diamonds" value={String(totalDiscoveries)} accent="emerald" subtitle={`RDAP-verified · ${hitRate}% hit`} />
+        <StatCard label="RDAP rejected" value={String(rdapFalsePositives)} accent="rose" subtitle="DNS-free but registry-taken" />
         <StatCard label="Dupes blocked" value={String(totalDuplicateSkips)} accent="amber" subtitle={`history ${recentMemory.toLocaleString()} · ${checksPerSecond}/sec`} />
       </div>
+
+      {cleanupRunning && (
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          <Zap className="h-4 w-4" />
+          <span>
+            Cleanup running — re-verifying legacy diamonds via Verisign RDAP:{" "}
+            <span className="font-semibold">{cleanupChecked.toLocaleString()}</span> verified ·{" "}
+            <span className="font-semibold">{cleanupRemoved.toLocaleString()}</span> false-positives removed
+          </span>
+        </div>
+      )}
+      {!cleanupRunning && rdapVerified > 0 && (
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs text-emerald-200">
+          <span>
+            Two-stage gate active: DNS check → Verisign RDAP confirm.{" "}
+            <span className="font-semibold">{rdapVerified.toLocaleString()}</span> verified this session ·{" "}
+            <span className="font-semibold">{rdapFalsePositives.toLocaleString()}</span> rejected by registry
+          </span>
+        </div>
+      )}
 
       {state?.currentCategory && state.currentStrategy && running && (
         <div className="mb-6 flex items-center gap-2 rounded-md border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-sm">

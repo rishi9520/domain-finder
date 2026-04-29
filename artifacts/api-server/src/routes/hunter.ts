@@ -44,6 +44,12 @@ router.post("/hunter/start", async (req, res): Promise<void> => {
   res.json(hunter.getState());
 });
 
+router.post("/hunter/cleanup", async (_req, res): Promise<void> => {
+  // Fire-and-forget; respond immediately.
+  void hunter.runLegacyCleanup();
+  res.json({ ok: true, ...hunter.getState() });
+});
+
 router.post("/hunter/speed", (req, res): void => {
   hunter.setSpeed({
     batchSize:

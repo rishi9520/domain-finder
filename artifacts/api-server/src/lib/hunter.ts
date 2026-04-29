@@ -5,7 +5,9 @@ import { generate, ALL_STRATEGIES } from "./generators";
 import { scoreCandidate } from "./scoring";
 import { generateTrendsForCategory, buildRationale } from "./groq";
 import { dnsAvailabilityBatch, type DnsCheckResult } from "./availability";
+import { rdapBatch } from "./rdap";
 import { logger } from "./logger";
+import { eq } from "drizzle-orm";
 
 const CATEGORIES = [
   "ai",
@@ -54,6 +56,12 @@ export interface HunterState {
   totalDiscoveries: number;
   totalUnknown: number;
   totalDuplicateSkips: number;
+  totalRdapVerified: number;
+  totalRdapFalsePositives: number;
+  totalRdapUnknown: number;
+  cleanupRunning: boolean;
+  cleanupChecked: number;
+  cleanupRemoved: number;
   currentCategory: Category | null;
   currentStrategy: Strategy | null;
   minValueScore: number;
@@ -83,6 +91,12 @@ class Hunter extends EventEmitter {
     totalDiscoveries: 0,
     totalUnknown: 0,
     totalDuplicateSkips: 0,
+    totalRdapVerified: 0,
+    totalRdapFalsePositives: 0,
+    totalRdapUnknown: 0,
+    cleanupRunning: false,
+    cleanupChecked: 0,
+    cleanupRemoved: 0,
     currentCategory: null,
     currentStrategy: null,
     minValueScore: 50,
@@ -436,18 +450,67 @@ class Hunter extends EventEmitter {
 
     let registered = 0;
     let unknown = 0;
-    const diamonds: { name: string; fqdn: string; result: DnsCheckResult; score: ReturnType<typeof scoreCandidate> }[] = [];
+    const dnsCandidates: { name: string; fqdn: string; result: DnsCheckResult; score: ReturnType<typeof scoreCandidate> }[] = [];
     for (let i = 0; i < results.length; i++) {
       const r = results[i]!;
       const p = passing[i]!;
       if (r.signal === "registered") registered++;
       else if (r.signal === "unknown") unknown++;
       else if (r.signal === "available") {
-        diamonds.push({ name: p.name, fqdn: r.fqdn, result: r, score: p.score });
+        dnsCandidates.push({ name: p.name, fqdn: r.fqdn, result: r, score: p.score });
       }
     }
     this.state.totalRegistered += registered;
     this.state.totalUnknown += unknown;
+
+    // === RDAP GATE ===
+    // DNS can have false positives (parked / pending-delete / no-NS-but-registered).
+    // Verisign RDAP is authoritative for .com — confirm every "available" before saving.
+    let diamonds: typeof dnsCandidates = [];
+    let rdapFalsePos = 0;
+    let rdapUnknown = 0;
+    if (dnsCandidates.length > 0) {
+      const rdapResults = await rdapBatch(
+        dnsCandidates.map((d) => d.fqdn),
+        8,
+        50,
+      );
+      const rdapPersist: DnsCheckResult[] = [];
+      for (let i = 0; i < dnsCandidates.length; i++) {
+        const c = dnsCandidates[i]!;
+        const v = rdapResults[i]!;
+        if (v.verdict === "available") {
+          // Truly unregistered. Replace evidence with combined DNS+RDAP proof.
+          diamonds.push({
+            ...c,
+            result: { ...c.result, evidence: `${c.result.evidence} · ${v.evidence}` },
+          });
+          rdapPersist.push({ fqdn: c.fqdn, signal: "available", evidence: v.evidence, checkedAt: new Date().toISOString() });
+        } else if (v.verdict === "registered") {
+          rdapFalsePos++;
+          // DNS missed it — record proper signal in cache so we never return it again.
+          rdapPersist.push({ fqdn: c.fqdn, signal: "registered", evidence: v.evidence, checkedAt: new Date().toISOString() });
+        } else {
+          // RDAP unknown — be conservative, don't ship as diamond.
+          rdapUnknown++;
+          rdapPersist.push({ fqdn: c.fqdn, signal: "unknown", evidence: v.evidence, checkedAt: new Date().toISOString() });
+        }
+      }
+      this.state.totalRdapVerified += diamonds.length;
+      this.state.totalRdapFalsePositives += rdapFalsePos;
+      this.state.totalRdapUnknown += rdapUnknown;
+      try {
+        await this.bulkCacheUpsert(rdapPersist);
+      } catch (err) {
+        logger.error({ err }, "Bulk dns_cache RDAP upsert failed");
+      }
+      if (rdapFalsePos > 0) {
+        this.emitEvent({
+          kind: "info",
+          message: `RDAP rejected ${rdapFalsePos} parked/pending-delete (DNS said free, registry says taken)`,
+        });
+      }
+    }
 
     // Insert diamonds in bulk.
     if (diamonds.length > 0) {
@@ -515,16 +578,93 @@ class Hunter extends EventEmitter {
     // Per-cycle summary line (one event, not per-name).
     this.emitEvent({
       kind: "generated",
-      message: `→ ${results.length} probed @ ${ratePerSec}/sec | taken ${registered} · unknown ${unknown} · diamonds ${diamonds.length}`,
+      message: `→ ${results.length} probed @ ${ratePerSec}/sec | taken ${registered} · dns-free ${dnsCandidates.length} · RDAP-rejected ${rdapFalsePos} · diamonds ${diamonds.length}`,
       data: {
         probed: results.length,
         registered,
         unknown,
+        dnsAvailable: dnsCandidates.length,
+        rdapFalsePositives: rdapFalsePos,
+        rdapUnknown,
         diamonds: diamonds.length,
         ratePerSec,
         elapsed,
       },
     });
+  }
+
+  // ===== One-shot background cleanup of legacy diamonds (pre-RDAP) =====
+  async runLegacyCleanup() {
+    if (this.state.cleanupRunning) return;
+    this.state.cleanupRunning = true;
+    this.state.cleanupChecked = 0;
+    this.state.cleanupRemoved = 0;
+    this.emitEvent({
+      kind: "info",
+      message: "Starting RDAP re-verification of existing diamonds (background)",
+    });
+    try {
+      const all = await db
+        .select({ id: discoveriesTable.id, fqdn: discoveriesTable.fqdn })
+        .from(discoveriesTable);
+      const total = all.length;
+      const CHUNK = 16;
+      for (let i = 0; i < all.length; i += CHUNK) {
+        if (this.stopRequested && !this.state.running) break;
+        const slice = all.slice(i, i + CHUNK);
+        const verdicts = await rdapBatch(
+          slice.map((r) => r.fqdn),
+          8,
+          80,
+        );
+        const toDelete: number[] = [];
+        const cachePersist: DnsCheckResult[] = [];
+        for (let j = 0; j < slice.length; j++) {
+          const v = verdicts[j]!;
+          if (v.verdict === "registered") {
+            toDelete.push(slice[j]!.id);
+            cachePersist.push({
+              fqdn: slice[j]!.fqdn,
+              signal: "registered",
+              evidence: v.evidence,
+              checkedAt: new Date().toISOString(),
+            });
+          }
+        }
+        if (toDelete.length > 0) {
+          try {
+            for (const id of toDelete) {
+              await db.delete(discoveriesTable).where(eq(discoveriesTable.id, id));
+            }
+            await this.bulkCacheUpsert(cachePersist);
+            this.state.cleanupRemoved += toDelete.length;
+            this.state.totalDiscoveries = Math.max(0, this.state.totalDiscoveries - toDelete.length);
+            this.emitEvent({
+              kind: "info",
+              message: `Cleanup: removed ${toDelete.length} parked/registered (running total ${this.state.cleanupRemoved}/${this.state.cleanupChecked + slice.length})`,
+            });
+          } catch (err) {
+            logger.error({ err }, "Cleanup delete failed");
+          }
+        }
+        this.state.cleanupChecked += slice.length;
+        if (i % (CHUNK * 10) === 0) {
+          this.emitEvent({
+            kind: "info",
+            message: `Cleanup progress: ${this.state.cleanupChecked}/${total} verified · ${this.state.cleanupRemoved} removed`,
+          });
+        }
+      }
+      this.emitEvent({
+        kind: "info",
+        message: `Cleanup complete: ${this.state.cleanupChecked} verified, ${this.state.cleanupRemoved} false positives removed`,
+      });
+    } catch (err) {
+      logger.error({ err }, "Legacy cleanup failed");
+      this.emitEvent({ kind: "error", message: `Cleanup error: ${(err as Error).message}` });
+    } finally {
+      this.state.cleanupRunning = false;
+    }
   }
 
   private async loop() {
