@@ -3,15 +3,22 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  Brain,
   Check,
+  ChevronDown,
   Cpu,
+  Database,
   ExternalLink,
+  Filter,
   Gem,
+  HelpCircle,
   Pause,
   Play,
   Radar,
+  RefreshCw,
   ShieldX,
   Sparkles,
+  Trash2,
   X,
   Zap,
 } from "lucide-react";
@@ -22,11 +29,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   fetchDiscoveries,
+  fetchInsights,
+  resetHunterMemory,
   startHunter,
   stopHunter,
   useHunterStream,
   type Discovery,
   type HunterEvent,
+  type HunterInsights,
 } from "@/hooks/use-hunter-stream";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -43,6 +53,14 @@ const STRATEGY_LABEL: Record<string, string> = {
   dictionary_hack: "Dictionary Hack",
   transliteration: "Transliteration",
   four_letter: "4-Letter",
+};
+
+const STRATEGY_DESC: Record<string, string> = {
+  brandable_cvcv: "Phonetic 5-letter consonant-vowel patterns (e.g. gefuv)",
+  future_suffix: "Trend keyword + futuristic suffix (e.g. lumolab, hubpico)",
+  dictionary_hack: "Real word + tech ending like x/code/ai (e.g. codex, gatex)",
+  transliteration: "Hindi/Sanskrit roots Romanized (e.g. agnix, varuna)",
+  four_letter: "Ultra-premium 4-character names",
 };
 
 function eventIcon(kind: HunterEvent["kind"]) {
@@ -120,9 +138,7 @@ function DiscoveryCard({ d }: { d: Discovery }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="font-mono text-base font-semibold truncate">
-              {d.fqdn}
-            </h3>
+            <h3 className="font-mono text-base font-semibold truncate">{d.fqdn}</h3>
             {d.radioTest && (
               <Badge
                 variant="outline"
@@ -156,9 +172,7 @@ function DiscoveryCard({ d }: { d: Discovery }) {
           </div>
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground/90 line-clamp-2">
-        {d.rationale}
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground/90 line-clamp-2">{d.rationale}</p>
       <div className="mt-3 flex items-center justify-between text-[11px]">
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <Check className="h-3 w-3 text-emerald-400" />
@@ -174,8 +188,212 @@ function DiscoveryCard({ d }: { d: Discovery }) {
           Register <ExternalLink className="h-3 w-3" />
         </a>
       </div>
-      <div className="mt-1 text-[10px] text-muted-foreground/70">
-        Found {timeAgo(d.discoveredAt)}
+      <div className="mt-1 text-[10px] text-muted-foreground/70">Found {timeAgo(d.discoveredAt)}</div>
+    </div>
+  );
+}
+
+function HowItWorks() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-border bg-card/30 mb-6">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+        data-testid="button-how-it-works"
+      >
+        <span className="flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 text-cyan-300" />
+          <span className="text-sm font-semibold">How the hunter works (5 stages)</span>
+          <span className="text-xs text-muted-foreground">— click to expand</span>
+        </span>
+        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="border-t border-border/40 px-4 py-4 grid gap-3 md:grid-cols-5 text-xs">
+          <Step
+            n={1}
+            color="violet"
+            icon={<Brain className="h-4 w-4" />}
+            title="Trend keywords"
+            body="Groq llama-3.3 fetches what's hot in the chosen deep-tech category (AI, Quantum, Biotech, Green Energy, Space-Tech). Cached 30 min."
+          />
+          <Step
+            n={2}
+            color="amber"
+            icon={<Sparkles className="h-4 w-4" />}
+            title="Generate 30 candidates"
+            body="One of 5 strategies builds new names. Recently-seen names are excluded so every cycle gets fresh output."
+          />
+          <Step
+            n={3}
+            color="cyan"
+            icon={<Filter className="h-4 w-4" />}
+            title="Score & filter"
+            body="Each name scored 0-100 across length, TLD, trend match, phonetics, memorability, radio test. Only ≥ min score reach DNS."
+          />
+          <Step
+            n={4}
+            color="rose"
+            icon={<Radar className="h-4 w-4" />}
+            title="Real DNS verify"
+            body="Node DNS lookup checks NS + SOA records. NS exists → registered. NXDOMAIN → genuinely unregistered. Cached 6 hours."
+          />
+          <Step
+            n={5}
+            color="emerald"
+            icon={<Gem className="h-4 w-4" />}
+            title="Save diamond"
+            body="Unregistered name + Groq-written rationale → vault. Deduped by fqdn so same name never enters twice."
+          />
+          <div className="md:col-span-5 mt-2 grid gap-2 sm:grid-cols-5">
+            {Object.entries(STRATEGY_LABEL).map(([key, label]) => (
+              <div
+                key={key}
+                className="rounded-md border border-border/50 bg-card/40 p-2"
+              >
+                <div className="text-[11px] font-semibold text-foreground">{label}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  {STRATEGY_DESC[key]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Step({
+  n,
+  color,
+  icon,
+  title,
+  body,
+}: {
+  n: number;
+  color: "violet" | "amber" | "cyan" | "rose" | "emerald";
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  const colorMap = {
+    violet: "border-violet-400/40 text-violet-200 bg-violet-500/10",
+    amber: "border-amber-400/40 text-amber-200 bg-amber-500/10",
+    cyan: "border-cyan-400/40 text-cyan-200 bg-cyan-500/10",
+    rose: "border-rose-400/40 text-rose-200 bg-rose-500/10",
+    emerald: "border-emerald-400/40 text-emerald-200 bg-emerald-500/10",
+  };
+  return (
+    <div className={cn("rounded-md border p-3", colorMap[color])}>
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5">{icon}<span className="font-semibold">{title}</span></span>
+        <span className="text-[10px] opacity-60">#{n}</span>
+      </div>
+      <p className="mt-1.5 text-[11px] opacity-90 leading-snug">{body}</p>
+    </div>
+  );
+}
+
+function YieldBar({
+  label,
+  generated,
+  checked,
+  diamonds,
+  yieldPct,
+}: {
+  label: string;
+  generated: number;
+  checked: number;
+  diamonds: number;
+  yieldPct: number;
+}) {
+  const max = Math.max(checked, 1);
+  const checkedPct = (checked / Math.max(generated, 1)) * 100;
+  const diamondsPct = (diamonds / max) * 100;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground tabular-nums">
+          {diamonds}<span className="opacity-50">/{checked}</span> · {yieldPct}% yield
+        </span>
+      </div>
+      <div className="relative h-2 rounded bg-muted/30 overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-0 bg-cyan-500/40"
+          style={{ width: `${Math.min(100, checkedPct)}%` }}
+        />
+        <div
+          className="absolute inset-y-0 left-0 bg-emerald-400"
+          style={{ width: `${Math.min(100, (diamonds / Math.max(generated, 1)) * 100)}%` }}
+        />
+      </div>
+      <div className="text-[10px] text-muted-foreground tabular-nums">
+        gen {generated} · scored-pass {checked} · diamonds {diamonds} ({diamondsPct.toFixed(0)}% of probed)
+      </div>
+    </div>
+  );
+}
+
+function InsightsPanel({ insights }: { insights: HunterInsights | undefined }) {
+  if (!insights) {
+    return (
+      <div className="text-xs text-muted-foreground p-4">Loading insights…</div>
+    );
+  }
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <div className="rounded-lg border border-border bg-card/30 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Zap className="h-4 w-4 text-amber-300" /> Per strategy yield
+          </h3>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            diamonds / probed
+          </span>
+        </div>
+        <div className="space-y-3">
+          {insights.perStrategy.length === 0 && (
+            <p className="text-xs text-muted-foreground">No data yet — start the hunter.</p>
+          )}
+          {insights.perStrategy.map((s) => (
+            <YieldBar
+              key={s.key}
+              label={STRATEGY_LABEL[s.key] ?? s.key}
+              generated={s.generated}
+              checked={s.checked}
+              diamonds={s.diamonds}
+              yieldPct={s.diamondYield}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border border-border bg-card/30 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Brain className="h-4 w-4 text-violet-300" /> Per category yield
+          </h3>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            diamonds / probed
+          </span>
+        </div>
+        <div className="space-y-3">
+          {insights.perCategory.length === 0 && (
+            <p className="text-xs text-muted-foreground">No data yet — start the hunter.</p>
+          )}
+          {insights.perCategory.map((c) => (
+            <YieldBar
+              key={c.key}
+              label={CATEGORY_LABEL[c.key] ?? c.key}
+              generated={c.generated}
+              checked={c.checked}
+              diamonds={c.diamonds}
+              yieldPct={c.diamondYield}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -183,8 +401,8 @@ function DiscoveryCard({ d }: { d: Discovery }) {
 
 export function Live() {
   const { events, state, connected } = useHunterStream();
-  const [minScore, setMinScore] = useState(75);
-  const [filterScore, setFilterScore] = useState(70);
+  const [minScore, setMinScore] = useState(55);
+  const [filterScore, setFilterScore] = useState(55);
   const queryClient = useQueryClient();
 
   const discoveriesQuery = useQuery({
@@ -193,19 +411,30 @@ export function Live() {
     refetchInterval: 4000,
   });
 
-  // When a new discovery event arrives, invalidate the list
+  const insightsQuery = useQuery({
+    queryKey: ["hunter-insights"],
+    queryFn: fetchInsights,
+    refetchInterval: 3000,
+  });
+
   useEffect(() => {
     if (events[0]?.kind === "discovery") {
       queryClient.invalidateQueries({ queryKey: ["discoveries"] });
+      queryClient.invalidateQueries({ queryKey: ["hunter-insights"] });
     }
   }, [events, queryClient]);
 
   const running = state?.running ?? false;
   const cycle = state?.cycle ?? 0;
   const totalGenerated = state?.totalGenerated ?? 0;
+  const totalScoreFiltered = state?.totalScoreFiltered ?? 0;
   const totalChecked = state?.totalChecked ?? 0;
   const totalRegistered = state?.totalRegistered ?? 0;
   const totalDiscoveries = state?.totalDiscoveries ?? 0;
+  const totalDuplicateSkips = state?.totalDuplicateSkips ?? 0;
+  const recentMemory = state?.recentNamesSize ?? 0;
+  const effectiveMinScore = state?.effectiveMinScore ?? minScore;
+  const starvation = state?.starvationStreak ?? 0;
 
   const hitRate = useMemo(() => {
     if (totalChecked === 0) return 0;
@@ -218,6 +447,11 @@ export function Live() {
     } else {
       await startHunter(minScore);
     }
+  }
+
+  async function handleResetMemory() {
+    await resetHunterMemory();
+    queryClient.invalidateQueries({ queryKey: ["hunter-insights"] });
   }
 
   return (
@@ -244,7 +478,7 @@ export function Live() {
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Always-on diamond finder. Generates, scores, and DNS-verifies brandable .com candidates non-stop. Only truly unregistered names land in the vault.
+            Always-on diamond finder. Generates, scores, and DNS-verifies brandable .com candidates non-stop. Generator memory ensures every cycle produces fresh names.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -255,16 +489,32 @@ export function Live() {
             <div className="mt-1 flex items-center gap-2">
               <Slider
                 value={[minScore]}
-                min={50}
+                min={40}
                 max={95}
                 step={1}
-                onValueChange={(v) => setMinScore(v[0] ?? 75)}
+                onValueChange={(v) => setMinScore(v[0] ?? 55)}
                 className="w-40"
                 data-testid="slider-min-score"
               />
               <span className="font-mono text-sm w-8 text-right">{minScore}</span>
             </div>
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              effective: <span className="font-mono">{effectiveMinScore}</span>
+              {starvation > 0 && (
+                <span className="ml-2 text-amber-300">starvation {starvation}/8</span>
+              )}
+            </div>
           </div>
+          <Button
+            onClick={handleResetMemory}
+            size="lg"
+            variant="outline"
+            className="border-amber-400/40 text-amber-300 hover:bg-amber-500/10"
+            data-testid="button-reset-memory"
+            title="Forget recently-seen names — restart fresh exploration"
+          >
+            <Trash2 className="mr-2 h-4 w-4" /> Clear memory
+          </Button>
           <Button
             onClick={handleToggle}
             size="lg"
@@ -289,13 +539,17 @@ export function Live() {
         </div>
       </header>
 
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-6">
-        <StatCard label="Status" value={running ? "RUNNING" : "IDLE"} accent={running ? "primary" : "muted"} />
+      <HowItWorks />
+
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-8 mb-6">
+        <StatCard label="Status" value={running ? "RUN" : "IDLE"} accent={running ? "primary" : "muted"} />
         <StatCard label="Cycle" value={String(cycle)} />
         <StatCard label="Generated" value={String(totalGenerated)} />
-        <StatCard label="DNS checked" value={String(totalChecked)} />
+        <StatCard label="Score-filtered" value={String(totalScoreFiltered)} accent="muted" subtitle="below min" />
+        <StatCard label="DNS checked" value={String(totalChecked)} accent="cyan" />
         <StatCard label="Already taken" value={String(totalRegistered)} accent="rose" />
         <StatCard label="Diamonds" value={String(totalDiscoveries)} accent="emerald" subtitle={`${hitRate}% hit`} />
+        <StatCard label="Dupes blocked" value={String(totalDuplicateSkips)} accent="amber" subtitle={`mem ${recentMemory}`} />
       </div>
 
       {state?.currentCategory && state.currentStrategy && running && (
@@ -310,9 +564,28 @@ export function Live() {
             <span className="font-semibold">
               {STRATEGY_LABEL[state.currentStrategy] ?? state.currentStrategy}
             </span>
+            {" — "}
+            <span className="text-xs text-muted-foreground">
+              filter: score ≥ {effectiveMinScore} · memory: {recentMemory} names known
+            </span>
           </span>
         </div>
       )}
+
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <Database className="h-4 w-4 text-cyan-300" /> Performance breakdown
+          </h2>
+          <button
+            onClick={() => insightsQuery.refetch()}
+            className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          >
+            <RefreshCw className="h-3 w-3" /> refresh
+          </button>
+        </div>
+        <InsightsPanel insights={insightsQuery.data} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
         <section className="rounded-lg border border-border bg-card/30">
@@ -370,10 +643,10 @@ export function Live() {
               <span className="text-muted-foreground">Filter ≥</span>
               <Slider
                 value={[filterScore]}
-                min={50}
+                min={40}
                 max={95}
                 step={5}
-                onValueChange={(v) => setFilterScore(v[0] ?? 70)}
+                onValueChange={(v) => setFilterScore(v[0] ?? 55)}
                 className="w-32"
               />
               <span className="font-mono w-6 text-right">{filterScore}</span>
@@ -388,7 +661,7 @@ export function Live() {
                 <Gem className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                 <h3 className="text-base font-semibold">Vault is empty</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Start the hunter — diamonds will appear here the moment one is verified unregistered.
+                  Try lowering the filter slider, or start the hunter — diamonds appear here the moment one is verified unregistered.
                 </p>
               </div>
             )}
@@ -415,7 +688,7 @@ function StatCard({
   label: string;
   value: string;
   subtitle?: string;
-  accent?: "default" | "primary" | "emerald" | "rose" | "muted";
+  accent?: "default" | "primary" | "emerald" | "rose" | "muted" | "cyan" | "amber";
 }) {
   const accentClass =
     accent === "primary"
@@ -424,20 +697,18 @@ function StatCard({
         ? "text-emerald-300"
         : accent === "rose"
           ? "text-rose-300"
-          : accent === "muted"
-            ? "text-muted-foreground"
-            : "text-foreground";
+          : accent === "cyan"
+            ? "text-cyan-300"
+            : accent === "amber"
+              ? "text-amber-300"
+              : accent === "muted"
+                ? "text-muted-foreground"
+                : "text-foreground";
   return (
     <div className="rounded-lg border border-border bg-card/40 p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className={cn("mt-1 text-2xl font-bold tabular-nums", accentClass)}>
-        {value}
-      </div>
-      {subtitle && (
-        <div className="mt-0.5 text-[10px] text-muted-foreground">{subtitle}</div>
-      )}
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 text-xl font-bold tabular-nums", accentClass)}>{value}</div>
+      {subtitle && <div className="mt-0.5 text-[10px] text-muted-foreground">{subtitle}</div>}
     </div>
   );
 }

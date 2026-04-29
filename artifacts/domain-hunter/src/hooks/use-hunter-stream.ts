@@ -17,18 +17,40 @@ export interface HunterEvent {
   data?: Record<string, unknown>;
 }
 
+export interface PerBucketStats {
+  generated: number;
+  checked: number;
+  diamonds: number;
+}
+
 export interface HunterState {
   running: boolean;
   startedAt: string | null;
   cycle: number;
   totalGenerated: number;
+  totalScoreFiltered: number;
   totalChecked: number;
   totalRegistered: number;
   totalDiscoveries: number;
   totalUnknown: number;
+  totalDuplicateSkips: number;
   currentCategory: string | null;
   currentStrategy: string | null;
   minValueScore: number;
+  effectiveMinScore: number;
+  starvationStreak: number;
+  perStrategy: Record<string, PerBucketStats>;
+  perCategory: Record<string, PerBucketStats>;
+  recentNamesSize: number;
+}
+
+export interface HunterInsights {
+  perStrategy: Array<PerBucketStats & { key: string; diamondYield: number }>;
+  perCategory: Array<PerBucketStats & { key: string; diamondYield: number }>;
+  recentNamesMemory: number;
+  effectiveMinScore: number;
+  requestedMinScore: number;
+  starvationStreak: number;
 }
 
 const MAX_EVENTS = 250;
@@ -128,6 +150,18 @@ export async function stopHunter(): Promise<HunterState> {
   const res = await fetch(`${API_BASE}/hunter/stop`, { method: "POST" });
   if (!res.ok) throw new Error(`Failed to stop: ${res.status}`);
   return (await res.json()) as HunterState;
+}
+
+export async function resetHunterMemory(): Promise<HunterState> {
+  const res = await fetch(`${API_BASE}/hunter/reset`, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to reset: ${res.status}`);
+  return (await res.json()) as HunterState;
+}
+
+export async function fetchInsights(): Promise<HunterInsights> {
+  const res = await fetch(`${API_BASE}/hunter/insights`);
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as HunterInsights;
 }
 
 export interface Discovery {

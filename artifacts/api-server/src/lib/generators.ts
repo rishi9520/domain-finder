@@ -262,21 +262,37 @@ export function generate(
   trendKeywords: string[],
   count: number,
   seed = Date.now(),
+  excludeNames?: Set<string>,
 ): string[] {
+  // Oversample 4x and filter against excludeNames so we always get fresh names.
+  const oversample = excludeNames ? count * 4 : count;
+  let raw: string[];
   switch (strategy) {
     case "brandable_cvcv":
-      return generateBrandableCVCV(count, seed);
+      raw = generateBrandableCVCV(oversample, seed);
+      break;
     case "future_suffix":
-      return generateFutureSuffix(category, trendKeywords, count, seed);
+      raw = generateFutureSuffix(category, trendKeywords, oversample, seed);
+      break;
     case "dictionary_hack":
-      return generateDictionaryHack(trendKeywords, count, seed);
+      raw = generateDictionaryHack(trendKeywords, oversample, seed);
+      break;
     case "transliteration":
-      return generateTransliteration(count, seed);
+      raw = generateTransliteration(oversample, seed);
+      break;
     case "four_letter":
-      return generateFourLetter(count, seed);
+      raw = generateFourLetter(oversample, seed);
+      break;
     default:
-      return generateBrandableCVCV(count, seed);
+      raw = generateBrandableCVCV(oversample, seed);
   }
+  if (!excludeNames || excludeNames.size === 0) return raw.slice(0, count);
+  const fresh: string[] = [];
+  for (const name of raw) {
+    if (!excludeNames.has(name)) fresh.push(name);
+    if (fresh.length >= count) break;
+  }
+  return fresh;
 }
 
 export { isVowel, patternOf };

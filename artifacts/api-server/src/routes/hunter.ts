@@ -45,6 +45,15 @@ router.post("/hunter/stop", (_req, res): void => {
   res.json(hunter.getState());
 });
 
+router.post("/hunter/reset", (_req, res): void => {
+  hunter.reset();
+  res.json(hunter.getState());
+});
+
+router.get("/hunter/insights", (_req, res): void => {
+  res.json(hunter.getInsights());
+});
+
 router.get("/hunter/stream", (req: Request, res: Response): void => {
   res.set({
     "Content-Type": "text/event-stream",

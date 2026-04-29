@@ -1,0 +1,432 @@
+Trend keywords loaded: genes, cells, virus, prote…
+6:09:07 PM · info
+Cycle #327: hunting biotech via brandable_cvcv
+6:09:07 PM · phase
+No candidates above 95 score this cycle
+6:09:05 PM · info
+Generated 30 candidates, top score 86.6
+6:09:05 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:09:05 PM · info
+Cycle #326: hunting quantum via brandable_cvcv
+6:09:05 PM · phase
+No candidates above 95 score this cycle
+6:09:04 PM · info
+Generated 30 candidates, top score 86.6
+6:09:04 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:09:04 PM · info
+Cycle #325: hunting ai via brandable_cvcv
+6:09:04 PM · phase
+No candidates above 95 score this cycle
+6:09:02 PM · info
+Generated 30 candidates, top score 75.2
+6:09:02 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:09:02 PM · info
+Cycle #324: hunting space_tech via four_letter
+6:09:02 PM · phase
+No candidates above 95 score this cycle
+6:09:01 PM · info
+Generated 30 candidates, top score 76.8
+6:09:01 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:09:01 PM · info
+Cycle #323: hunting green_energy via four_letter
+6:09:01 PM · phase
+No candidates above 95 score this cycle
+6:08:59 PM · info
+Generated 30 candidates, top score 75.9
+6:08:59 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:59 PM · info
+Cycle #322: hunting biotech via four_letter
+6:08:59 PM · phase
+No candidates above 95 score this cycle
+6:08:58 PM · info
+Generated 30 candidates, top score 76.8
+6:08:58 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:58 PM · info
+Cycle #321: hunting quantum via four_letter
+6:08:58 PM · phase
+No candidates above 95 score this cycle
+6:08:56 PM · info
+Generated 30 candidates, top score 76.8
+6:08:56 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:56 PM · info
+Cycle #320: hunting ai via four_letter
+6:08:56 PM · phase
+No candidates above 95 score this cycle
+6:08:55 PM · info
+Generated 30 candidates, top score 81.7
+6:08:55 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:55 PM · info
+Cycle #319: hunting space_tech via transliteration
+6:08:55 PM · phase
+No candidates above 95 score this cycle
+6:08:53 PM · info
+Generated 30 candidates, top score 81.2
+6:08:53 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:53 PM · info
+Cycle #318: hunting green_energy via transliteration
+6:08:53 PM · phase
+No candidates above 95 score this cycle
+6:08:52 PM · info
+Generated 30 candidates, top score 81.7
+6:08:52 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:52 PM · info
+Cycle #317: hunting biotech via transliteration
+6:08:52 PM · phase
+No candidates above 95 score this cycle
+6:08:50 PM · info
+Generated 30 candidates, top score 78.7
+6:08:50 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:50 PM · info
+Cycle #316: hunting quantum via transliteration
+6:08:50 PM · phase
+No candidates above 95 score this cycle
+6:08:49 PM · info
+Generated 30 candidates, top score 81.2
+6:08:49 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:49 PM · info
+Cycle #315: hunting ai via transliteration
+6:08:49 PM · phase
+corex.com already registered (cache: NS: udns1.cscdns.net, udns2.cscdns.uk)
+6:08:47 PM · registered
+Probing corex.com (score 95)
+6:08:47 PM · checking
+Checking DNS for 1 high-value candidates
+6:08:47 PM · phase
+Generated 30 candidates, top score 95
+6:08:47 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:47 PM · info
+Cycle #314: hunting space_tech via dictionary_hack
+6:08:47 PM · phase
+No candidates above 95 score this cycle
+6:08:46 PM · info
+Generated 30 candidates, top score 92.3
+6:08:46 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:46 PM · info
+Cycle #313: hunting green_energy via dictionary_hack
+6:08:46 PM · phase
+No candidates above 95 score this cycle
+6:08:44 PM · info
+Generated 30 candidates, top score 92.6
+6:08:44 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:44 PM · info
+Cycle #312: hunting biotech via dictionary_hack
+6:08:44 PM · phase
+nodex.com already registered (NS: ns67.worldnic.com, ns68.worldnic.com)
+6:08:43 PM · registered
+Probing nodex.com (score 95)
+6:08:43 PM · checking
+gatex.com already registered (cache: NS: ns2.namepros-dns.is, ns1.namepros-dns.com)
+6:08:43 PM · registered
+Probing gatex.com (score 96.3)
+6:08:43 PM · checking
+codex.com already registered (cache: NS: ns0.phase8.net, ns1.phase8.net)
+6:08:43 PM · registered
+Probing codex.com (score 97.5)
+6:08:43 PM · checking
+Checking DNS for 3 high-value candidates
+6:08:43 PM · phase
+Generated 30 candidates, top score 97.5
+6:08:43 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:43 PM · info
+Cycle #311: hunting quantum via dictionary_hack
+6:08:43 PM · phase
+No candidates above 95 score this cycle
+6:08:41 PM · info
+Generated 30 candidates, top score 93.2
+6:08:41 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:41 PM · info
+Cycle #310: hunting ai via dictionary_hack
+6:08:41 PM · phase
+No candidates above 95 score this cycle
+6:08:40 PM · info
+Generated 30 candidates, top score 88
+6:08:40 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:40 PM · info
+Cycle #309: hunting space_tech via future_suffix
+6:08:40 PM · phase
+No candidates above 95 score this cycle
+6:08:38 PM · info
+Generated 30 candidates, top score 88.1
+6:08:38 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:38 PM · info
+Cycle #308: hunting green_energy via future_suffix
+6:08:38 PM · phase
+No candidates above 95 score this cycle
+6:08:37 PM · info
+Generated 30 candidates, top score 87.5
+6:08:37 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:37 PM · info
+Cycle #307: hunting biotech via future_suffix
+6:08:37 PM · phase
+No candidates above 95 score this cycle
+6:08:35 PM · info
+Generated 30 candidates, top score 87.5
+6:08:35 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:35 PM · info
+Cycle #306: hunting quantum via future_suffix
+6:08:35 PM · phase
+No candidates above 95 score this cycle
+6:08:34 PM · info
+Generated 30 candidates, top score 82.9
+6:08:34 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:34 PM · info
+Cycle #305: hunting ai via future_suffix
+6:08:34 PM · phase
+No candidates above 95 score this cycle
+6:08:32 PM · info
+Generated 30 candidates, top score 86.6
+6:08:32 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:32 PM · info
+Cycle #304: hunting space_tech via brandable_cvcv
+6:08:32 PM · phase
+No candidates above 95 score this cycle
+6:08:31 PM · info
+Generated 30 candidates, top score 86.6
+6:08:31 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:31 PM · info
+Cycle #303: hunting green_energy via brandable_cvcv
+6:08:31 PM · phase
+No candidates above 95 score this cycle
+6:08:29 PM · info
+Generated 30 candidates, top score 86.6
+6:08:29 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:29 PM · info
+Cycle #302: hunting biotech via brandable_cvcv
+6:08:29 PM · phase
+No candidates above 95 score this cycle
+6:08:28 PM · info
+Generated 30 candidates, top score 86.6
+6:08:28 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:28 PM · info
+Cycle #301: hunting quantum via brandable_cvcv
+6:08:28 PM · phase
+No candidates above 95 score this cycle
+6:08:26 PM · info
+Generated 30 candidates, top score 86.6
+6:08:26 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:26 PM · info
+Cycle #300: hunting ai via brandable_cvcv
+6:08:26 PM · phase
+No candidates above 95 score this cycle
+6:08:25 PM · info
+Generated 30 candidates, top score 76.8
+6:08:25 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:25 PM · info
+Cycle #299: hunting space_tech via four_letter
+6:08:25 PM · phase
+No candidates above 95 score this cycle
+6:08:23 PM · info
+Generated 30 candidates, top score 76.8
+6:08:23 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:23 PM · info
+Cycle #298: hunting green_energy via four_letter
+6:08:23 PM · phase
+No candidates above 95 score this cycle
+6:08:22 PM · info
+Generated 30 candidates, top score 75.9
+6:08:22 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:22 PM · info
+Cycle #297: hunting biotech via four_letter
+6:08:22 PM · phase
+No candidates above 95 score this cycle
+6:08:20 PM · info
+Generated 30 candidates, top score 78.8
+6:08:20 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:20 PM · info
+Cycle #296: hunting quantum via four_letter
+6:08:20 PM · phase
+No candidates above 95 score this cycle
+6:08:19 PM · info
+Generated 30 candidates, top score 75.7
+6:08:19 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:19 PM · info
+Cycle #295: hunting ai via four_letter
+6:08:19 PM · phase
+No candidates above 95 score this cycle
+6:08:17 PM · info
+Generated 30 candidates, top score 81.7
+6:08:17 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:17 PM · info
+Cycle #294: hunting space_tech via transliteration
+6:08:17 PM · phase
+No candidates above 95 score this cycle
+6:08:16 PM · info
+Generated 30 candidates, top score 81.7
+6:08:16 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:16 PM · info
+Cycle #293: hunting green_energy via transliteration
+6:08:16 PM · phase
+No candidates above 95 score this cycle
+6:08:14 PM · info
+Generated 30 candidates, top score 80
+6:08:14 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:14 PM · info
+Cycle #292: hunting biotech via transliteration
+6:08:14 PM · phase
+No candidates above 95 score this cycle
+6:08:13 PM · info
+Generated 30 candidates, top score 81.7
+6:08:13 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:13 PM · info
+Cycle #291: hunting quantum via transliteration
+6:08:13 PM · phase
+No candidates above 95 score this cycle
+6:08:11 PM · info
+Generated 30 candidates, top score 80
+6:08:11 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:11 PM · info
+Cycle #290: hunting ai via transliteration
+6:08:11 PM · phase
+corex.com already registered (cache: NS: udns1.cscdns.net, udns2.cscdns.uk)
+6:08:10 PM · registered
+Probing corex.com (score 95)
+6:08:10 PM · checking
+Checking DNS for 1 high-value candidates
+6:08:10 PM · phase
+Generated 30 candidates, top score 95
+6:08:10 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:10 PM · info
+Cycle #289: hunting space_tech via dictionary_hack
+6:08:10 PM · phase
+No candidates above 95 score this cycle
+6:08:08 PM · info
+Generated 30 candidates, top score 92.1
+6:08:08 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:08 PM · info
+Cycle #288: hunting green_energy via dictionary_hack
+6:08:08 PM · phase
+No candidates above 95 score this cycle
+6:08:07 PM · info
+Generated 30 candidates, top score 91.7
+6:08:07 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:08:07 PM · info
+Cycle #287: hunting biotech via dictionary_hack
+6:08:07 PM · phase
+xcode.com already registered (cache: NS: dns1.registrar-servers.com, dns2.registrar-servers.com)
+6:08:05 PM · registered
+Probing xcode.com (score 95)
+6:08:05 PM · checking
+Checking DNS for 1 high-value candidates
+6:08:05 PM · phase
+Generated 30 candidates, top score 95
+6:08:05 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:08:05 PM · info
+Cycle #286: hunting quantum via dictionary_hack
+6:08:05 PM · phase
+No candidates above 95 score this cycle
+6:08:03 PM · info
+Generated 30 candidates, top score 93.8
+6:08:03 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:08:03 PM · info
+Cycle #285: hunting ai via dictionary_hack
+6:08:03 PM · phase
+No candidates above 95 score this cycle
+6:08:02 PM · info
+Generated 30 candidates, top score 86.4
+6:08:02 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:08:02 PM · info
+Cycle #284: hunting space_tech via future_suffix
+6:08:02 PM · phase
+No candidates above 95 score this cycle
+6:08:00 PM · info
+Generated 30 candidates, top score 88.8
+6:08:00 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:08:00 PM · info
+Cycle #283: hunting green_energy via future_suffix
+6:08:00 PM · phase
+No candidates above 95 score this cycle
+6:07:59 PM · info
+Generated 30 candidates, top score 86.2
+6:07:59 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:07:59 PM · info
+Cycle #282: hunting biotech via future_suffix
+6:07:59 PM · phase
+No candidates above 95 score this cycle
+6:07:57 PM · info
+Generated 30 candidates, top score 86.7
+6:07:57 PM · generated
+Trend keywords loaded: flux, code, bits, gate…
+6:07:57 PM · info
+Cycle #281: hunting quantum via future_suffix
+6:07:57 PM · phase
+No candidates above 95 score this cycle
+6:07:56 PM · info
+Generated 30 candidates, top score 84
+6:07:56 PM · generated
+Trend keywords loaded: netai, brain, nodes, cores…
+6:07:56 PM · info
+Cycle #280: hunting ai via future_suffix
+6:07:56 PM · phase
+No candidates above 95 score this cycle
+6:07:54 PM · info
+Generated 30 candidates, top score 86.6
+6:07:54 PM · generated
+Trend keywords loaded: orbit, lunar, nexus, pulse…
+6:07:54 PM · info
+Cycle #279: hunting space_tech via brandable_cvcv
+6:07:54 PM · phase
+No candidates above 95 score this cycle
+6:07:53 PM · info
+Generated 30 candidates, top score 86.6
+6:07:53 PM · generated
+Trend keywords loaded: solar, hydro, windy, bio…
+6:07:53 PM · info
+Cycle #278: hunting green_energy via brandable_cvcv
+6:07:53 PM · phase
+No candidates above 95 score this cycle
+6:07:51 PM · info
+Generated 30 candidates, top score 86.6
+6:07:51 PM · generated
+Trend keywords loaded: genes, cells, virus, prote…
+6:07:51 PM · info
+Cycle #277: hunting biotech via brandable_cvcv
+6:07:51 PM · phase
+No candidates above 95 score this cycle
+6:07:50 PM · info
+Generated 30 candidates, top score 86.6
+6:07:50 PM · generated
