@@ -1,7 +1,7 @@
 import { logger } from "./logger";
+import { dnsAvailability, dnsAvailabilityBatch } from "./availability";
 
 const GODADDY_BASE = "https://api.godaddy.com/v1/domains/available";
-const GODADDY_OTE_BASE = "https://api.ote-godaddy.com/v1/domains/available";
 
 export interface AvailabilityResult {
   fqdn: string;
@@ -11,6 +11,7 @@ export interface AvailabilityResult {
   period: number | null;
   source: string;
   message: string | null;
+  evidence: string | null;
 }
 
 function parseGoDaddyKey(): { key: string; secret: string } | null {
@@ -18,123 +19,134 @@ function parseGoDaddyKey(): { key: string; secret: string } | null {
   if (!raw) return null;
   if (raw.includes(":")) {
     const [key, secret] = raw.split(":");
-    return { key: key ?? "", secret: secret ?? "" };
+    if (key && secret) return { key, secret };
   }
-  return { key: raw, secret: raw };
+  return null;
 }
 
-function heuristicAvailability(fqdn: string): AvailabilityResult {
-  let h = 0;
-  for (const c of fqdn) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  const available = h % 5 !== 0;
-  return {
-    fqdn,
-    available,
-    listPrice: available ? Math.round(((h % 8000) + 999) * 100) / 100 : null,
-    currency: available ? "USD" : null,
-    period: 1,
-    source: "heuristic",
-    message: "GoDaddy unavailable, using heuristic fallback",
-  };
-}
-
-async function tryGoDaddy(
+async function tryGoDaddyPrice(
   fqdn: string,
-  base: string,
   creds: { key: string; secret: string },
-): Promise<{ ok: true; data: AvailabilityResult } | { ok: false; status: number; body: string }> {
-  const url = `${base}?domain=${encodeURIComponent(fqdn)}&checkType=FAST&forTransfer=false`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: `sso-key ${creds.key}:${creds.secret}`,
-    },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) {
-    const txt = await response.text();
-    return { ok: false, status: response.status, body: txt.slice(0, 200) };
+): Promise<{ price: number | null; currency: string | null; period: number | null } | null> {
+  const url = `${GODADDY_BASE}?domain=${encodeURIComponent(fqdn)}&checkType=FAST&forTransfer=false`;
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `sso-key ${creds.key}:${creds.secret}`,
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) {
+      const txt = await response.text();
+      logger.debug(
+        { fqdn, status: response.status, body: txt.slice(0, 120) },
+        "GoDaddy price lookup non-OK",
+      );
+      return null;
+    }
+    const json = (await response.json()) as {
+      available?: boolean;
+      price?: number;
+      currency?: string;
+      period?: number;
+    };
+    return {
+      price: typeof json.price === "number" ? json.price / 1_000_000 : null,
+      currency: json.currency ?? null,
+      period: json.period ?? null,
+    };
+  } catch (err) {
+    logger.debug({ fqdn, err }, "GoDaddy price lookup failed");
+    return null;
   }
-  const json = (await response.json()) as {
-    available?: boolean;
-    price?: number;
-    currency?: string;
-    period?: number;
-  };
-  const price = typeof json.price === "number" ? json.price / 1_000_000 : null;
-  return {
-    ok: true,
-    data: {
-      fqdn,
-      available: json.available ?? null,
-      listPrice: price,
-      currency: json.currency ?? "USD",
-      period: json.period ?? 1,
-      source: base.includes("ote-") ? "godaddy_ote" : "godaddy",
-      message: null,
-    },
-  };
 }
 
 export async function checkAvailability(fqdn: string): Promise<AvailabilityResult> {
+  const dns = await dnsAvailability(fqdn);
   const creds = parseGoDaddyKey();
-  if (!creds) {
-    return heuristicAvailability(fqdn);
+  let price: { price: number | null; currency: string | null; period: number | null } | null =
+    null;
+  if (creds && dns.signal !== "registered") {
+    price = await tryGoDaddyPrice(fqdn, creds);
   }
 
-  try {
-    const prod = await tryGoDaddy(fqdn, GODADDY_BASE, creds);
-    if (prod.ok) return prod.data;
-    if (prod.status === 401 || prod.status === 403) {
-      const ote = await tryGoDaddy(fqdn, GODADDY_OTE_BASE, creds);
-      if (ote.ok) return ote.data;
-      logger.warn(
-        { fqdn, status: ote.status, body: ote.body },
-        "GoDaddy OTE rejected key, falling back to heuristic",
-      );
-      return heuristicAvailability(fqdn);
-    }
-    if (prod.status === 429) {
-      return {
-        fqdn,
-        available: null,
-        listPrice: null,
-        currency: null,
-        period: null,
-        source: "godaddy",
-        message: "Rate limited",
-      };
-    }
-    logger.warn(
-      { fqdn, status: prod.status, body: prod.body },
-      "GoDaddy non-OK response, falling back to heuristic",
-    );
-    return heuristicAvailability(fqdn);
-  } catch (err) {
-    logger.warn({ fqdn, err }, "GoDaddy request failed");
-    return heuristicAvailability(fqdn);
+  if (dns.signal === "available") {
+    return {
+      fqdn,
+      available: true,
+      listPrice: price?.price ?? null,
+      currency: price?.currency ?? null,
+      period: price?.period ?? null,
+      source: "dns_ns_lookup",
+      message: null,
+      evidence: dns.evidence,
+    };
   }
+  if (dns.signal === "registered") {
+    return {
+      fqdn,
+      available: false,
+      listPrice: null,
+      currency: null,
+      period: null,
+      source: "dns_ns_lookup",
+      message: "Domain is registered (DNS records found)",
+      evidence: dns.evidence,
+    };
+  }
+  return {
+    fqdn,
+    available: null,
+    listPrice: price?.price ?? null,
+    currency: price?.currency ?? null,
+    period: price?.period ?? null,
+    source: "dns_ns_lookup",
+    message: "Inconclusive — try again",
+    evidence: dns.evidence,
+  };
 }
 
 export async function checkAvailabilityBatch(
   fqdns: string[],
-  concurrency = 8,
+  concurrency = 12,
 ): Promise<AvailabilityResult[]> {
-  const results: AvailabilityResult[] = new Array(fqdns.length);
-  let cursor = 0;
-  async function worker() {
-    while (true) {
-      const idx = cursor++;
-      if (idx >= fqdns.length) return;
-      const fqdn = fqdns[idx]!;
-      results[idx] = await checkAvailability(fqdn);
+  const dnsResults = await dnsAvailabilityBatch(fqdns, concurrency);
+  return dnsResults.map((dns) => {
+    if (dns.signal === "available") {
+      return {
+        fqdn: dns.fqdn,
+        available: true,
+        listPrice: null,
+        currency: null,
+        period: null,
+        source: "dns_ns_lookup",
+        message: null,
+        evidence: dns.evidence,
+      };
     }
-  }
-  const workers = Array.from(
-    { length: Math.min(concurrency, fqdns.length) },
-    () => worker(),
-  );
-  await Promise.all(workers);
-  return results;
+    if (dns.signal === "registered") {
+      return {
+        fqdn: dns.fqdn,
+        available: false,
+        listPrice: null,
+        currency: null,
+        period: null,
+        source: "dns_ns_lookup",
+        message: "Domain is registered (DNS records found)",
+        evidence: dns.evidence,
+      };
+    }
+    return {
+      fqdn: dns.fqdn,
+      available: null,
+      listPrice: null,
+      currency: null,
+      period: null,
+      source: "dns_ns_lookup",
+      message: "Inconclusive",
+      evidence: dns.evidence,
+    };
+  });
 }

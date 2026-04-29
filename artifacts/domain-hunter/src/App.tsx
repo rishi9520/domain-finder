@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
 import { Home } from "@/pages/home";
+import { Live } from "@/pages/live";
 import { Trends } from "@/pages/trends";
 import { Saved } from "@/pages/saved";
 import { Stats } from "@/pages/stats";
@@ -23,6 +24,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/live" component={Live} />
         <Route path="/trends" component={Trends} />
         <Route path="/saved" component={Saved} />
         <Route path="/stats" component={Stats} />

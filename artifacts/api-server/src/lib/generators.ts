@@ -1,5 +1,60 @@
 import { isVowel, hasAwkwardCluster, patternOf } from "./scoring";
 
+const BLOCKED_FRAGMENTS = [
+  "fuck",
+  "fuk",
+  "fuq",
+  "shit",
+  "cunt",
+  "dick",
+  "cock",
+  "pussy",
+  "bitch",
+  "nigg",
+  "rape",
+  "porn",
+  "anal",
+  "anus",
+  "tits",
+  "boob",
+  "slut",
+  "whore",
+  "fag",
+  "homo",
+  "kkk",
+  "nazi",
+  "kike",
+  "spic",
+  "chink",
+  "hitler",
+  "isis",
+  "jihad",
+  "kill",
+  "die",
+  "dead",
+  "suck",
+  "ugly",
+  "scam",
+  "fraud",
+  "spam",
+  "junk",
+  "trash",
+  "vagina",
+  "penis",
+  "sex",
+  "xxx",
+  "loli",
+  "incest",
+];
+
+function isClean(name: string): boolean {
+  const lower = name.toLowerCase();
+  for (const bad of BLOCKED_FRAGMENTS) {
+    if (lower.includes(bad)) return false;
+  }
+  return true;
+}
+
 const CONSONANTS = "bcdfghjklmnpqrstvwxyz".split("");
 const PRIMARY_CONS = "bdfgklmnprstvz".split("");
 const VOWELS_LIST = "aeiou".split("");
@@ -97,7 +152,7 @@ export function generateBrandableCVCV(
     if (r < 0.4) name = genCVCV(rng);
     else if (r < 0.75) name = genCVCVC(rng);
     else name = genCVCCV(rng);
-    if (!hasAwkwardCluster(name)) out.add(name);
+    if (!hasAwkwardCluster(name) && isClean(name)) out.add(name);
   }
   return Array.from(out);
 }
@@ -124,13 +179,13 @@ export function generateFutureSuffix(
       const root = pick(seeds, rng);
       const suf = pick(suffixes, rng);
       const candidate = (root + suf).slice(0, 9);
-      if (!hasAwkwardCluster(candidate) && candidate.length >= 5)
+      if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
         out.add(candidate);
     } else {
       const pre = pick(prefixes, rng).slice(0, 4);
       const suf = pick(suffixes, rng);
       const candidate = (pre + suf).slice(0, 9);
-      if (!hasAwkwardCluster(candidate) && candidate.length >= 5)
+      if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
         out.add(candidate);
     }
   }
@@ -156,7 +211,7 @@ export function generateDictionaryHack(
     const b = pick(power, rng);
     const r = rng();
     const candidate = (r < 0.5 ? a + b : b + a).slice(0, 12);
-    if (!hasAwkwardCluster(candidate) && candidate.length >= 4)
+    if (!hasAwkwardCluster(candidate) && candidate.length >= 4 && isClean(candidate))
       out.add(candidate);
   }
   return Array.from(out);
@@ -174,7 +229,7 @@ export function generateTransliteration(
     const root = pick(TRANSLIT_ROOTS, rng);
     const suf = pick(TRANSLIT_SUFFIXES, rng);
     const candidate = (root + suf).toLowerCase().slice(0, 12);
-    if (!hasAwkwardCluster(candidate) && candidate.length >= 5)
+    if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
       out.add(candidate);
   }
   return Array.from(out);
@@ -196,7 +251,7 @@ export function generateFourLetter(
       if (ch === "L") s += pick(CONSONANTS.concat(VOWELS_LIST), rng);
       else s += pick(digits, rng);
     }
-    if (!hasAwkwardCluster(s.replace(/[0-9]/g, ""))) out.add(s);
+    if (!hasAwkwardCluster(s.replace(/[0-9]/g, "")) && isClean(s)) out.add(s);
   }
   return Array.from(out);
 }

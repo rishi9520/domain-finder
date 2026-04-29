@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Activity, BarChart2, Bookmark, Home, Zap } from "lucide-react";
+import { Activity, BarChart2, Bookmark, Home, Radar, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Hunter", icon: Home },
+  { href: "/live", label: "Live Hunter", icon: Radar },
   { href: "/trends", label: "Trends Lab", icon: Zap },
   { href: "/saved", label: "Shortlist", icon: Bookmark },
   { href: "/stats", label: "Analytics", icon: BarChart2 },
