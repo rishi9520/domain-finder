@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { hunter } from "./lib/hunter";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,15 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Auto-arm the hunter on boot so the live page is always producing diamonds.
+  // Defer briefly so the server is fully up before history loads.
+  setTimeout(() => {
+    void hunter
+      .start()
+      .then(() => logger.info({}, "Hunter auto-armed"))
+      .catch((err) => logger.error({ err }, "Hunter auto-arm failed"));
+    // Kick off a one-shot RDAP re-verification of legacy diamonds in background.
+    void hunter.runLegacyCleanup();
+  }, 500);
 });

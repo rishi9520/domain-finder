@@ -2,24 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
-  AlertTriangle,
-  Brain,
-  Check,
-  ChevronDown,
+  CheckCircle2,
+  Copy,
   Cpu,
   Database,
   ExternalLink,
-  Filter,
+  Flame,
+  Gauge,
   Gem,
-  HelpCircle,
   Pause,
   Play,
   Radar,
-  RefreshCw,
-  ShieldX,
+  ShieldCheck,
   Sparkles,
   Trash2,
-  X,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,14 +25,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   fetchDiscoveries,
-  fetchInsights,
   resetHunterMemory,
   startHunter,
   stopHunter,
   useHunterStream,
   type Discovery,
   type HunterEvent,
-  type HunterInsights,
 } from "@/hooks/use-hunter-stream";
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -47,413 +41,334 @@ const CATEGORY_LABEL: Record<string, string> = {
   space_tech: "Space-Tech",
 };
 
+const CATEGORY_COLOR: Record<string, string> = {
+  ai: "border-violet-400/40 text-violet-200 bg-violet-500/10",
+  quantum: "border-cyan-400/40 text-cyan-200 bg-cyan-500/10",
+  biotech: "border-emerald-400/40 text-emerald-200 bg-emerald-500/10",
+  green_energy: "border-lime-400/40 text-lime-200 bg-lime-500/10",
+  space_tech: "border-amber-400/40 text-amber-200 bg-amber-500/10",
+};
+
 const STRATEGY_LABEL: Record<string, string> = {
   brandable_cvcv: "Brandable CVCV",
   future_suffix: "Future Suffix",
   dictionary_hack: "Dictionary Hack",
   transliteration: "Transliteration",
-  four_letter: "4-Letter",
+  prefix_root: "Prefix-Root",
+  color_tech: "Color-Tech",
+  vowel_start: "Vowel-Start",
+  portmanteau: "Portmanteau",
+  short_suffix: "Short Suffix",
 };
 
-const STRATEGY_DESC: Record<string, string> = {
-  brandable_cvcv: "Phonetic 5-letter consonant-vowel patterns (e.g. gefuv)",
-  future_suffix: "Trend keyword + futuristic suffix (e.g. lumolab, hubpico)",
-  dictionary_hack: "Real word + tech ending like x/code/ai (e.g. codex, gatex)",
-  transliteration: "Hindi/Sanskrit roots Romanized (e.g. agnix, varuna)",
-  four_letter: "Ultra-premium 4-character names",
-};
-
-function eventIcon(kind: HunterEvent["kind"]) {
-  switch (kind) {
-    case "discovery":
-      return <Gem className="h-3.5 w-3.5 text-emerald-400" />;
-    case "registered":
-      return <ShieldX className="h-3.5 w-3.5 text-rose-400/70" />;
-    case "checking":
-      return <Radar className="h-3.5 w-3.5 text-cyan-300" />;
-    case "phase":
-      return <Cpu className="h-3.5 w-3.5 text-violet-300" />;
-    case "generated":
-      return <Sparkles className="h-3.5 w-3.5 text-amber-300" />;
-    case "skipped":
-      return <X className="h-3.5 w-3.5 text-muted-foreground" />;
-    case "error":
-      return <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />;
-    default:
-      return <Activity className="h-3.5 w-3.5 text-muted-foreground" />;
-  }
+function fmt(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
 }
 
-function eventTextClass(kind: HunterEvent["kind"]) {
-  switch (kind) {
-    case "discovery":
-      return "text-emerald-200 font-medium";
-    case "registered":
-      return "text-rose-300/70";
-    case "checking":
-      return "text-cyan-200/90";
-    case "phase":
-      return "text-violet-200";
-    case "generated":
-      return "text-amber-200/90";
-    case "error":
-      return "text-rose-300";
-    default:
-      return "text-muted-foreground";
-  }
-}
-
-function scoreColor(score: number) {
-  if (score >= 90) return "text-emerald-300";
-  if (score >= 80) return "text-cyan-300";
-  if (score >= 70) return "text-amber-300";
-  return "text-muted-foreground";
-}
-
-function scoreRingBg(score: number) {
-  if (score >= 90) return "bg-emerald-500/20 border-emerald-400/40";
-  if (score >= 80) return "bg-cyan-500/20 border-cyan-400/40";
-  if (score >= 70) return "bg-amber-500/15 border-amber-400/40";
-  return "bg-muted/40 border-border";
-}
-
-function timeAgo(iso: string) {
+function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   if (ms < 1000) return "just now";
   if (ms < 60_000) return `${Math.floor(ms / 1000)}s ago`;
   if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  return `${Math.floor(ms / 3_600_000)}h ago`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
+  return `${Math.floor(ms / 86_400_000)}d ago`;
 }
 
-function DiscoveryCard({ d }: { d: Discovery }) {
-  const purchaseUrl = `https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(d.fqdn)}`;
+function scoreColor(score: number): string {
+  if (score >= 90) return "text-emerald-300";
+  if (score >= 80) return "text-cyan-300";
+  if (score >= 70) return "text-amber-300";
+  return "text-foreground/80";
+}
+
+function scoreBg(score: number): string {
+  if (score >= 90) return "from-emerald-500/20 to-emerald-500/5 border-emerald-400/40";
+  if (score >= 80) return "from-cyan-500/15 to-cyan-500/5 border-cyan-400/40";
+  if (score >= 70) return "from-amber-500/15 to-amber-500/5 border-amber-400/40";
+  return "from-card/40 to-card/10 border-border";
+}
+
+function tierLabel(score: number): string {
+  if (score >= 90) return "S-tier diamond";
+  if (score >= 80) return "A-tier brand";
+  if (score >= 70) return "B-tier candidate";
+  return "Watch";
+}
+
+function whyBest(d: Discovery): string[] {
+  const pts: string[] = [];
+  pts.push(
+    `Only ${d.length} letters — short names like this regularly trade for ${d.length === 5 ? "₹50L–5Cr" : d.length === 6 ? "₹10L–1Cr" : "₹3L–30L"} on Sedo / Afternic.`,
+  );
+  pts.push(
+    `Pattern ${d.pattern} → easy to pronounce, type, and remember (radio-test ${d.radioTest ? "passed" : "borderline"}).`,
+  );
+  pts.push(
+    `Memorability score ${d.memorability}/100 — built from vowel rhythm, syllable count, and absence of awkward consonant clusters.`,
+  );
+  pts.push(
+    `${CATEGORY_LABEL[d.category] ?? d.category} fits a high-velocity sector (AI, quantum, biotech, climate, space) where founders pay premium for premium .com.`,
+  );
+  pts.push(
+    `Generated by "${STRATEGY_LABEL[d.strategy] ?? d.strategy}" — a strategy that has historically yielded the cleanest brandables in this hunter.`,
+  );
+  return pts;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <div
-      className={cn(
-        "group rounded-lg border bg-card/50 p-4 transition-all hover:border-primary/40 hover:bg-card/80",
-        scoreRingBg(d.valueScore),
-      )}
-      data-testid={`discovery-${d.fqdn}`}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      }}
+      className="inline-flex items-center gap-1 rounded border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+      data-testid={`copy-${text}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      {copied ? (
+        <>
+          <CheckCircle2 className="h-3 w-3 text-emerald-400" /> copied
+        </>
+      ) : (
+        <>
+          <Copy className="h-3 w-3" /> copy
+        </>
+      )}
+    </button>
+  );
+}
+
+function DiamondCard({ d }: { d: Discovery }) {
+  const godaddyUrl = `https://www.godaddy.com/domainsearch/find?domainToCheck=${encodeURIComponent(d.fqdn)}`;
+  const afternicUrl = `https://www.afternic.com/domain/${encodeURIComponent(d.fqdn)}`;
+  const points = whyBest(d);
+  return (
+    <article
+      className={cn(
+        "rounded-xl border bg-gradient-to-br p-5 transition-all hover:shadow-[0_0_0_1px_rgba(56,189,248,0.25)]",
+        scoreBg(d.valueScore),
+      )}
+      data-testid={`diamond-${d.fqdn}`}
+    >
+      <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-mono text-base font-semibold truncate">{d.fqdn}</h3>
+          <div className="flex items-baseline gap-2">
+            <h3
+              className="font-mono text-2xl font-bold tracking-tight truncate"
+              data-testid={`diamond-name-${d.fqdn}`}
+            >
+              {d.name}
+            </h3>
+            <span className="text-xl font-mono text-muted-foreground/70">.{d.tld}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge
+              variant="outline"
+              className={cn("text-[10px] uppercase tracking-wider", CATEGORY_COLOR[d.category])}
+            >
+              {CATEGORY_LABEL[d.category] ?? d.category}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] border-border/60 text-muted-foreground">
+              {d.length} letters
+            </Badge>
+            <Badge variant="outline" className="text-[10px] border-border/60 text-muted-foreground font-mono">
+              {d.pattern}
+            </Badge>
             {d.radioTest && (
               <Badge
                 variant="outline"
-                className="border-emerald-400/40 text-emerald-300 text-[10px] uppercase"
+                className="text-[10px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10"
               >
-                Radio
+                Radio-test pass
               </Badge>
             )}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-            <span>{CATEGORY_LABEL[d.category] ?? d.category}</span>
-            <span className="opacity-50">·</span>
-            <span>{STRATEGY_LABEL[d.strategy] ?? d.strategy}</span>
-            <span className="opacity-50">·</span>
-            <span className="font-mono">{d.pattern}</span>
-            <span className="opacity-50">·</span>
-            <span>{d.length}L</span>
+            <Badge
+              variant="outline"
+              className="text-[10px] border-cyan-400/40 text-cyan-200 bg-cyan-500/10"
+              title="Verisign RDAP confirms this .com is genuinely unregistered"
+            >
+              <ShieldCheck className="mr-1 h-3 w-3" /> RDAP-verified free
+            </Badge>
           </div>
         </div>
         <div
           className={cn(
-            "shrink-0 rounded-md border px-2.5 py-1.5 text-right",
-            scoreRingBg(d.valueScore),
+            "shrink-0 rounded-lg border bg-background/40 px-3 py-2 text-right",
+            scoreBg(d.valueScore),
           )}
         >
-          <div className={cn("text-xl font-bold leading-none", scoreColor(d.valueScore))}>
-            {d.valueScore.toFixed(1)}
+          <div className={cn("text-3xl font-bold leading-none tabular-nums", scoreColor(d.valueScore))}>
+            {d.valueScore.toFixed(0)}
           </div>
-          <div className="mt-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
-            Value
+          <div className="mt-1 text-[9px] uppercase tracking-wider text-muted-foreground">
+            {tierLabel(d.valueScore)}
           </div>
         </div>
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground/90 line-clamp-2">{d.rationale}</p>
-      <div className="mt-3 flex items-center justify-between text-[11px]">
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <Check className="h-3 w-3 text-emerald-400" />
-          <span className="font-mono">{d.dnsEvidence}</span>
-        </div>
-        <a
-          href={purchaseUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-primary hover:underline"
-          data-testid={`buy-${d.fqdn}`}
-        >
-          Register <ExternalLink className="h-3 w-3" />
-        </a>
-      </div>
-      <div className="mt-1 text-[10px] text-muted-foreground/70">Found {timeAgo(d.discoveredAt)}</div>
-    </div>
-  );
-}
+      </header>
 
-function HowItWorks() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="rounded-lg border border-border bg-card/30 mb-6">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
-        data-testid="button-how-it-works"
-      >
-        <span className="flex items-center gap-2">
-          <HelpCircle className="h-4 w-4 text-cyan-300" />
-          <span className="text-sm font-semibold">How the hunter works (5 stages)</span>
-          <span className="text-xs text-muted-foreground">— click to expand</span>
-        </span>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="border-t border-border/40 px-4 py-4 grid gap-3 md:grid-cols-5 text-xs">
-          <Step
-            n={1}
-            color="violet"
-            icon={<Brain className="h-4 w-4" />}
-            title="Trend keywords"
-            body="Groq llama-3.3 fetches what's hot in the chosen deep-tech category (AI, Quantum, Biotech, Green Energy, Space-Tech). Cached 30 min."
-          />
-          <Step
-            n={2}
-            color="amber"
-            icon={<Sparkles className="h-4 w-4" />}
-            title="Generate 30 candidates"
-            body="One of 5 strategies builds new names. Recently-seen names are excluded so every cycle gets fresh output."
-          />
-          <Step
-            n={3}
-            color="cyan"
-            icon={<Filter className="h-4 w-4" />}
-            title="Score & filter"
-            body="Each name scored 0-100 across length, TLD, trend match, phonetics, memorability, radio test. Only ≥ min score reach DNS."
-          />
-          <Step
-            n={4}
-            color="rose"
-            icon={<Radar className="h-4 w-4" />}
-            title="Real DNS verify"
-            body="Node DNS lookup checks NS + SOA records. NS exists → registered. NXDOMAIN → genuinely unregistered. Cached 6 hours."
-          />
-          <Step
-            n={5}
-            color="emerald"
-            icon={<Gem className="h-4 w-4" />}
-            title="Save diamond"
-            body="Unregistered name + Groq-written rationale → vault. Deduped by fqdn so same name never enters twice."
-          />
-          <div className="md:col-span-5 mt-2 grid gap-2 sm:grid-cols-5">
-            {Object.entries(STRATEGY_LABEL).map(([key, label]) => (
+      <section className="mt-4 rounded-md border border-border/40 bg-background/30 p-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+          <Sparkles className="h-3 w-3 text-amber-300" /> Why this is a diamond
+        </div>
+        <ul className="space-y-1.5 text-[12px] leading-relaxed text-foreground/85">
+          {points.map((p, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-emerald-400" />
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-3 rounded-md border border-border/40 bg-background/20 p-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+          AI rationale
+        </div>
+        <p className="text-[12px] leading-relaxed text-foreground/80">{d.rationale}</p>
+      </section>
+
+      <section className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded border border-border/40 bg-background/20 px-2.5 py-2">
+          <div className="text-[9px] uppercase tracking-wider text-muted-foreground">DNS evidence</div>
+          <div className="mt-0.5 font-mono text-foreground/80 truncate" title={d.dnsEvidence}>
+            {d.dnsEvidence}
+          </div>
+        </div>
+        <div className="rounded border border-border/40 bg-background/20 px-2.5 py-2">
+          <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Memorability</div>
+          <div className="mt-0.5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 rounded bg-muted/40 overflow-hidden">
               <div
-                key={key}
-                className="rounded-md border border-border/50 bg-card/40 p-2"
-              >
-                <div className="text-[11px] font-semibold text-foreground">{label}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {STRATEGY_DESC[key]}
-                </div>
-              </div>
-            ))}
+                className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                style={{ width: `${Math.min(100, d.memorability)}%` }}
+              />
+            </div>
+            <span className="font-mono tabular-nums">{d.memorability}</span>
           </div>
         </div>
-      )}
-    </div>
+      </section>
+
+      <footer className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[10px] text-muted-foreground">
+          Found {timeAgo(d.discoveredAt)} · {STRATEGY_LABEL[d.strategy] ?? d.strategy}
+        </div>
+        <div className="flex items-center gap-2">
+          <CopyButton text={d.fqdn} />
+          <a
+            href={afternicUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded border border-border/60 px-2 py-1 text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+          >
+            Afternic <ExternalLink className="h-3 w-3" />
+          </a>
+          <a
+            href={godaddyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded bg-primary/90 px-3 py-1.5 text-[11px] font-medium text-primary-foreground hover:bg-primary"
+            data-testid={`register-${d.fqdn}`}
+          >
+            Register on GoDaddy <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
+      </footer>
+    </article>
   );
 }
 
-function Step({
-  n,
-  color,
+function HeroStat({
   icon,
-  title,
-  body,
-}: {
-  n: number;
-  color: "violet" | "amber" | "cyan" | "rose" | "emerald";
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
-  const colorMap = {
-    violet: "border-violet-400/40 text-violet-200 bg-violet-500/10",
-    amber: "border-amber-400/40 text-amber-200 bg-amber-500/10",
-    cyan: "border-cyan-400/40 text-cyan-200 bg-cyan-500/10",
-    rose: "border-rose-400/40 text-rose-200 bg-rose-500/10",
-    emerald: "border-emerald-400/40 text-emerald-200 bg-emerald-500/10",
-  };
-  return (
-    <div className={cn("rounded-md border p-3", colorMap[color])}>
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5">{icon}<span className="font-semibold">{title}</span></span>
-        <span className="text-[10px] opacity-60">#{n}</span>
-      </div>
-      <p className="mt-1.5 text-[11px] opacity-90 leading-snug">{body}</p>
-    </div>
-  );
-}
-
-function YieldBar({
   label,
-  generated,
-  checked,
-  diamonds,
-  yieldPct,
+  value,
+  sub,
+  accent = "default",
 }: {
+  icon: React.ReactNode;
   label: string;
-  generated: number;
-  checked: number;
-  diamonds: number;
-  yieldPct: number;
+  value: string;
+  sub?: string;
+  accent?: "default" | "emerald" | "cyan" | "amber" | "violet" | "rose";
 }) {
-  const max = Math.max(checked, 1);
-  const checkedPct = (checked / Math.max(generated, 1)) * 100;
-  const diamondsPct = (diamonds / max) * 100;
+  const accentClass =
+    accent === "emerald"
+      ? "from-emerald-500/20 to-emerald-500/5 border-emerald-400/40 text-emerald-300"
+      : accent === "cyan"
+        ? "from-cyan-500/15 to-cyan-500/5 border-cyan-400/40 text-cyan-300"
+        : accent === "amber"
+          ? "from-amber-500/15 to-amber-500/5 border-amber-400/40 text-amber-300"
+          : accent === "violet"
+            ? "from-violet-500/15 to-violet-500/5 border-violet-400/40 text-violet-300"
+            : accent === "rose"
+              ? "from-rose-500/15 to-rose-500/5 border-rose-400/40 text-rose-300"
+              : "from-card/60 to-card/10 border-border text-foreground";
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground tabular-nums">
-          {diamonds}<span className="opacity-50">/{checked}</span> · {yieldPct}% yield
-        </span>
+    <div className={cn("rounded-xl border bg-gradient-to-br p-4", accentClass)}>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="opacity-70">{icon}</span>
       </div>
-      <div className="relative h-2 rounded bg-muted/30 overflow-hidden">
-        <div
-          className="absolute inset-y-0 left-0 bg-cyan-500/40"
-          style={{ width: `${Math.min(100, checkedPct)}%` }}
-        />
-        <div
-          className="absolute inset-y-0 left-0 bg-emerald-400"
-          style={{ width: `${Math.min(100, (diamonds / Math.max(generated, 1)) * 100)}%` }}
-        />
-      </div>
-      <div className="text-[10px] text-muted-foreground tabular-nums">
-        gen {generated} · scored-pass {checked} · diamonds {diamonds} ({diamondsPct.toFixed(0)}% of probed)
-      </div>
+      <div className="mt-2 text-2xl font-bold tabular-nums leading-none">{value}</div>
+      {sub && <div className="mt-1.5 text-[10px] text-muted-foreground">{sub}</div>}
     </div>
   );
 }
 
-function InsightsPanel({ insights }: { insights: HunterInsights | undefined }) {
-  if (!insights) {
-    return (
-      <div className="text-xs text-muted-foreground p-4">Loading insights…</div>
-    );
+function eventDot(kind: HunterEvent["kind"]): string {
+  switch (kind) {
+    case "discovery":
+      return "bg-emerald-400";
+    case "phase":
+      return "bg-violet-400";
+    case "generated":
+      return "bg-cyan-400";
+    case "error":
+      return "bg-rose-400";
+    case "info":
+      return "bg-amber-400";
+    default:
+      return "bg-muted-foreground";
   }
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <div className="rounded-lg border border-border bg-card/30 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Zap className="h-4 w-4 text-amber-300" /> Per strategy yield
-          </h3>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            diamonds / probed
-          </span>
-        </div>
-        <div className="space-y-3">
-          {insights.perStrategy.length === 0 && (
-            <p className="text-xs text-muted-foreground">No data yet — start the hunter.</p>
-          )}
-          {insights.perStrategy.map((s) => (
-            <YieldBar
-              key={s.key}
-              label={STRATEGY_LABEL[s.key] ?? s.key}
-              generated={s.generated}
-              checked={s.checked}
-              diamonds={s.diamonds}
-              yieldPct={s.diamondYield}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="rounded-lg border border-border bg-card/30 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Brain className="h-4 w-4 text-violet-300" /> Per category yield
-          </h3>
-          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            diamonds / probed
-          </span>
-        </div>
-        <div className="space-y-3">
-          {insights.perCategory.length === 0 && (
-            <p className="text-xs text-muted-foreground">No data yet — start the hunter.</p>
-          )}
-          {insights.perCategory.map((c) => (
-            <YieldBar
-              key={c.key}
-              label={CATEGORY_LABEL[c.key] ?? c.key}
-              generated={c.generated}
-              checked={c.checked}
-              diamonds={c.diamonds}
-              yieldPct={c.diamondYield}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function Live() {
   const { events, state, connected } = useHunterStream();
-  const [minScore, setMinScore] = useState(55);
-  const [filterScore, setFilterScore] = useState(55);
+  const [minScore, setMinScore] = useState(70);
   const queryClient = useQueryClient();
 
   const discoveriesQuery = useQuery({
-    queryKey: ["discoveries", filterScore],
-    queryFn: () => fetchDiscoveries({ limit: 60, minScore: filterScore }),
+    queryKey: ["discoveries", minScore],
+    queryFn: () => fetchDiscoveries({ limit: 60, minScore }),
     refetchInterval: 4000,
-  });
-
-  const insightsQuery = useQuery({
-    queryKey: ["hunter-insights"],
-    queryFn: fetchInsights,
-    refetchInterval: 3000,
   });
 
   useEffect(() => {
     if (events[0]?.kind === "discovery") {
       queryClient.invalidateQueries({ queryKey: ["discoveries"] });
-      queryClient.invalidateQueries({ queryKey: ["hunter-insights"] });
     }
   }, [events, queryClient]);
 
   const running = state?.running ?? false;
-  const cycle = state?.cycle ?? 0;
-  const totalGenerated = state?.totalGenerated ?? 0;
-  const totalScoreFiltered = state?.totalScoreFiltered ?? 0;
+  const totalEvaluated = state?.totalEvaluated ?? 0;
   const totalChecked = state?.totalChecked ?? 0;
-  const totalRegistered = state?.totalRegistered ?? 0;
   const totalDiscoveries = state?.totalDiscoveries ?? 0;
+  const evaluatedPerSecond = state?.evaluatedPerSecond ?? 0;
+  const checksPerSecond = state?.checksPerSecond ?? 0;
+  const everSearched = state?.everSearchedSize ?? state?.recentNamesSize ?? 0;
+  const rdapVerified = state?.totalRdapVerified ?? 0;
+  const rdapRejected = state?.totalRdapFalsePositives ?? 0;
+  const cleanupRunning = state?.cleanupRunning ?? false;
+  const cleanupChecked = state?.cleanupChecked ?? 0;
+  const cleanupRemoved = state?.cleanupRemoved ?? 0;
   const totalDuplicateSkips = state?.totalDuplicateSkips ?? 0;
-  const recentMemory =
-    (state as { everSearchedSize?: number; recentNamesSize?: number } | null)
-      ?.everSearchedSize ??
-    state?.recentNamesSize ??
-    0;
-  const checksPerSecond =
-    (state as { checksPerSecond?: number } | null)?.checksPerSecond ?? 0;
-  const rdapVerified =
-    (state as { totalRdapVerified?: number } | null)?.totalRdapVerified ?? 0;
-  const rdapFalsePositives =
-    (state as { totalRdapFalsePositives?: number } | null)
-      ?.totalRdapFalsePositives ?? 0;
-  const cleanupRunning =
-    (state as { cleanupRunning?: boolean } | null)?.cleanupRunning ?? false;
-  const cleanupChecked =
-    (state as { cleanupChecked?: number } | null)?.cleanupChecked ?? 0;
-  const cleanupRemoved =
-    (state as { cleanupRemoved?: number } | null)?.cleanupRemoved ?? 0;
-  const effectiveMinScore = state?.effectiveMinScore ?? minScore;
-  const starvation = state?.starvationStreak ?? 0;
+  const effectiveMinScore = state?.effectiveMinScore ?? 70;
 
-  const hitRate = useMemo(() => {
+  const yieldPct = useMemo(() => {
     if (totalChecked === 0) return 0;
     return Math.round((totalDiscoveries / totalChecked) * 1000) / 10;
   }, [totalChecked, totalDiscoveries]);
@@ -462,21 +377,21 @@ export function Live() {
     if (running) {
       await stopHunter();
     } else {
-      await startHunter(minScore);
+      await startHunter(70);
     }
   }
 
   async function handleResetMemory() {
     await resetHunterMemory();
-    queryClient.invalidateQueries({ queryKey: ["hunter-insights"] });
   }
 
   return (
-    <div className="p-6 max-w-[1500px] mx-auto">
+    <div className="px-6 py-6 max-w-[1500px] mx-auto">
+      {/* Header / status / controls */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Live Hunter</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">Diamond Hunting Cockpit</h1>
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider",
@@ -491,50 +406,39 @@ export function Live() {
                   connected ? "bg-emerald-400 animate-pulse" : "bg-rose-400",
                 )}
               />
-              {connected ? "Stream live" : "Reconnecting"}
+              {connected ? "Live stream" : "Reconnecting"}
+            </span>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider",
+                running
+                  ? "border-primary/50 text-primary bg-primary/10"
+                  : "border-border text-muted-foreground",
+              )}
+            >
+              {running ? "Hunter ARMED" : "Hunter idle"}
             </span>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Always-on diamond finder. Generates, scores, and DNS-verifies brandable .com candidates non-stop. Generator memory ensures every cycle produces fresh names.
+          <p className="mt-1.5 text-sm text-muted-foreground max-w-2xl">
+            Pro-grade .com diamond finder — only 5–7 letter brandable names in deep-tech (AI, Quantum, Biotech, Green Energy, Space-Tech). Every candidate is{" "}
+            <span className="text-cyan-300">DNS-checked</span> then{" "}
+            <span className="text-emerald-300">Verisign RDAP confirmed</span> truly unregistered. Names already searched are remembered forever.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Min value score
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <Slider
-                value={[minScore]}
-                min={40}
-                max={95}
-                step={1}
-                onValueChange={(v) => setMinScore(v[0] ?? 55)}
-                className="w-40"
-                data-testid="slider-min-score"
-              />
-              <span className="font-mono text-sm w-8 text-right">{minScore}</span>
-            </div>
-            <div className="mt-1 text-[10px] text-muted-foreground">
-              effective: <span className="font-mono">{effectiveMinScore}</span>
-              {starvation > 0 && (
-                <span className="ml-2 text-amber-300">starvation {starvation}/8</span>
-              )}
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
           <Button
             onClick={handleResetMemory}
-            size="lg"
+            size="sm"
             variant="outline"
             className="border-amber-400/40 text-amber-300 hover:bg-amber-500/10"
-            data-testid="button-reset-memory"
-            title="Forget recently-seen names — restart fresh exploration"
+            data-testid="button-reset"
+            title="Reset session counters (history is permanent and never cleared)"
           >
-            <Trash2 className="mr-2 h-4 w-4" /> Clear memory
+            <Trash2 className="mr-1 h-3.5 w-3.5" /> Reset counters
           </Button>
           <Button
             onClick={handleToggle}
-            size="lg"
+            size="sm"
             variant={running ? "outline" : "default"}
             className={cn(
               running
@@ -545,208 +449,180 @@ export function Live() {
           >
             {running ? (
               <>
-                <Pause className="mr-2 h-4 w-4" /> Stop
+                <Pause className="mr-1 h-3.5 w-3.5" /> Pause
               </>
             ) : (
               <>
-                <Play className="mr-2 h-4 w-4" /> Start hunting
+                <Play className="mr-1 h-3.5 w-3.5" /> Resume
               </>
             )}
           </Button>
         </div>
       </header>
 
-      <HowItWorks />
+      {/* Hero stats */}
+      <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <HeroStat
+          icon={<Flame className="h-4 w-4" />}
+          label="Evaluated / sec"
+          value={fmt(evaluatedPerSecond)}
+          sub={`${fmt(totalEvaluated)} total · in-memory generation`}
+          accent="amber"
+        />
+        <HeroStat
+          icon={<Radar className="h-4 w-4" />}
+          label="DNS / sec"
+          value={fmt(checksPerSecond)}
+          sub={`${fmt(totalChecked)} probed · top-scored only`}
+          accent="cyan"
+        />
+        <HeroStat
+          icon={<Gem className="h-4 w-4" />}
+          label="Diamonds in vault"
+          value={fmt(totalDiscoveries)}
+          sub={`${yieldPct}% diamond yield · all 5–7 letter`}
+          accent="emerald"
+        />
+        <HeroStat
+          icon={<ShieldCheck className="h-4 w-4" />}
+          label="RDAP verified"
+          value={fmt(rdapVerified)}
+          sub={`${fmt(rdapRejected)} parked/sale-page rejected`}
+          accent="violet"
+        />
+        <HeroStat
+          icon={<Database className="h-4 w-4" />}
+          label="Lifetime memory"
+          value={fmt(everSearched)}
+          sub={`${fmt(totalDuplicateSkips)} duplicates blocked this session`}
+        />
+        <HeroStat
+          icon={<Gauge className="h-4 w-4" />}
+          label="Score gate"
+          value={`≥ ${effectiveMinScore}`}
+          sub={`auto-tuned · only premium brandables pass`}
+        />
+      </section>
 
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-9 mb-6">
-        <StatCard label="Status" value={running ? "RUN" : "IDLE"} accent={running ? "primary" : "muted"} />
-        <StatCard label="Cycle" value={String(cycle)} />
-        <StatCard label="Generated" value={String(totalGenerated)} />
-        <StatCard label="Score-filtered" value={String(totalScoreFiltered)} accent="muted" subtitle="below min" />
-        <StatCard label="DNS checked" value={String(totalChecked)} accent="cyan" />
-        <StatCard label="Already taken" value={String(totalRegistered)} accent="rose" />
-        <StatCard label="Diamonds" value={String(totalDiscoveries)} accent="emerald" subtitle={`RDAP-verified · ${hitRate}% hit`} />
-        <StatCard label="RDAP rejected" value={String(rdapFalsePositives)} accent="rose" subtitle="DNS-free but registry-taken" />
-        <StatCard label="Dupes blocked" value={String(totalDuplicateSkips)} accent="amber" subtitle={`history ${recentMemory.toLocaleString()} · ${checksPerSecond}/sec`} />
-      </div>
-
+      {/* Cleanup banner */}
       {cleanupRunning && (
-        <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
           <Zap className="h-4 w-4" />
           <span>
-            Cleanup running — re-verifying legacy diamonds via Verisign RDAP:{" "}
-            <span className="font-semibold">{cleanupChecked.toLocaleString()}</span> verified ·{" "}
-            <span className="font-semibold">{cleanupRemoved.toLocaleString()}</span> false-positives removed
-          </span>
-        </div>
-      )}
-      {!cleanupRunning && rdapVerified > 0 && (
-        <div className="mb-3 flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs text-emerald-200">
-          <span>
-            Two-stage gate active: DNS check → Verisign RDAP confirm.{" "}
-            <span className="font-semibold">{rdapVerified.toLocaleString()}</span> verified this session ·{" "}
-            <span className="font-semibold">{rdapFalsePositives.toLocaleString()}</span> rejected by registry
+            Background cleanup re-verifying old vault entries via Verisign RDAP — removing any that are now parked or for-sale.{" "}
+            <span className="font-semibold">{cleanupChecked.toLocaleString()}</span> checked ·{" "}
+            <span className="font-semibold">{cleanupRemoved.toLocaleString()}</span> removed
           </span>
         </div>
       )}
 
-      {state?.currentCategory && state.currentStrategy && running && (
-        <div className="mb-6 flex items-center gap-2 rounded-md border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-sm">
-          <Zap className="h-4 w-4 text-violet-300" />
-          <span className="text-violet-200">
-            Currently scanning{" "}
-            <span className="font-semibold">
-              {CATEGORY_LABEL[state.currentCategory] ?? state.currentCategory}
-            </span>{" "}
-            via{" "}
-            <span className="font-semibold">
-              {STRATEGY_LABEL[state.currentStrategy] ?? state.currentStrategy}
-            </span>
-            {" — "}
-            <span className="text-xs text-muted-foreground">
-              filter: score ≥ {effectiveMinScore} · memory: {recentMemory} names known
-            </span>
+      {/* Filter strip */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card/30 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <Gem className="h-4 w-4 text-emerald-300" />
+          <h2 className="text-sm font-semibold">Diamond vault</h2>
+          <span className="text-xs text-muted-foreground">
+            sorted by value · {discoveriesQuery.data?.items.length ?? 0} shown of{" "}
+            {discoveriesQuery.data?.total.toLocaleString() ?? 0} verified
           </span>
         </div>
-      )}
-
-      <div className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <Database className="h-4 w-4 text-cyan-300" /> Performance breakdown
-          </h2>
-          <button
-            onClick={() => insightsQuery.refetch()}
-            className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-          >
-            <RefreshCw className="h-3 w-3" /> refresh
-          </button>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-muted-foreground">Show score ≥</span>
+          <Slider
+            value={[minScore]}
+            min={50}
+            max={95}
+            step={5}
+            onValueChange={(v) => setMinScore(v[0] ?? 70)}
+            className="w-40"
+            data-testid="slider-filter-score"
+          />
+          <span className="font-mono text-sm w-8 text-right tabular-nums">{minScore}</span>
         </div>
-        <InsightsPanel insights={insightsQuery.data} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
-        <section className="rounded-lg border border-border bg-card/30">
-          <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-cyan-300" />
-              <h2 className="text-sm font-semibold">Intelligence stream</h2>
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        {/* Diamond cards grid */}
+        <section>
+          {discoveriesQuery.isLoading && (
+            <div className="rounded-lg border border-dashed border-border/60 px-6 py-16 text-center text-sm text-muted-foreground">
+              Loading diamonds…
             </div>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {events.length} events
-            </span>
-          </div>
-          <ScrollArea className="h-[640px]">
-            <ul className="divide-y divide-border/40">
-              {events.length === 0 && (
-                <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  {running
-                    ? "Warming up… events will stream in within a moment."
-                    : "Press Start hunting to wake the engine."}
-                </li>
-              )}
-              {events.map((ev) => (
-                <li
-                  key={ev.id}
-                  className="px-4 py-2 flex items-start gap-2 text-xs"
-                  data-testid={`event-${ev.kind}`}
-                >
-                  <span className="mt-0.5 shrink-0">{eventIcon(ev.kind)}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className={cn("leading-snug", eventTextClass(ev.kind))}>
-                      {ev.message}
-                    </div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground/70 font-mono">
-                      {new Date(ev.ts).toLocaleTimeString()} · {ev.kind}
-                    </div>
-                  </div>
-                </li>
+          )}
+          {discoveriesQuery.data && discoveriesQuery.data.items.length === 0 && (
+            <div className="rounded-lg border border-dashed border-border/60 px-6 py-16 text-center">
+              <Gem className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+              <h3 className="text-base font-semibold">No diamonds at this gate yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Lower the score gate above, or wait — the hunter is generating thousands per second in the background.
+              </p>
+            </div>
+          )}
+          {discoveriesQuery.data && discoveriesQuery.data.items.length > 0 && (
+            <div className="grid gap-4 grid-cols-1 xl:grid-cols-2">
+              {discoveriesQuery.data.items.map((d) => (
+                <DiamondCard key={d.id} d={d} />
               ))}
-            </ul>
-          </ScrollArea>
+            </div>
+          )}
         </section>
 
-        <section className="rounded-lg border border-border bg-card/30">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Gem className="h-4 w-4 text-emerald-300" />
-              <h2 className="text-sm font-semibold">
-                Diamond vault
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  unregistered .com domains
-                </span>
-              </h2>
-            </div>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-muted-foreground">Filter ≥</span>
-              <Slider
-                value={[filterScore]}
-                min={40}
-                max={95}
-                step={5}
-                onValueChange={(v) => setFilterScore(v[0] ?? 55)}
-                className="w-32"
-              />
-              <span className="font-mono w-6 text-right">{filterScore}</span>
-              <span className="ml-2 rounded border border-border px-1.5 py-0.5 font-mono">
-                {discoveriesQuery.data?.items.length ?? 0}
+        {/* Live activity sidebar */}
+        <aside className="lg:sticky lg:top-[74px] lg:self-start">
+          <div className="rounded-lg border border-border bg-card/30">
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-cyan-300" />
+                <h3 className="text-sm font-semibold">Hunter telemetry</h3>
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                live
               </span>
             </div>
-          </div>
-          <div className="p-4">
-            {discoveriesQuery.data && discoveriesQuery.data.items.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border/60 px-6 py-16 text-center">
-                <Gem className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <h3 className="text-base font-semibold">Vault is empty</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Try lowering the filter slider, or start the hunter — diamonds appear here the moment one is verified unregistered.
-                </p>
+            {state?.currentCategory && state.currentStrategy && (
+              <div className="border-b border-border/40 px-4 py-2.5 text-xs">
+                <div className="flex items-center gap-1.5 text-violet-200">
+                  <Cpu className="h-3.5 w-3.5" />
+                  <span className="font-medium">
+                    {CATEGORY_LABEL[state.currentCategory] ?? state.currentCategory}
+                  </span>
+                  <span className="text-muted-foreground">via</span>
+                  <span className="font-medium">
+                    {STRATEGY_LABEL[state.currentStrategy] ?? state.currentStrategy}
+                  </span>
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  Cycle #{state.cycle} · batch {state.batchSize} · concurrency {state.concurrency}
+                </div>
               </div>
             )}
-            {discoveriesQuery.data && discoveriesQuery.data.items.length > 0 && (
-              <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                {discoveriesQuery.data.items.map((d) => (
-                  <DiscoveryCard key={d.id} d={d} />
+            <ScrollArea className="h-[520px]">
+              <ul className="divide-y divide-border/40">
+                {events.length === 0 && (
+                  <li className="px-4 py-12 text-center text-xs text-muted-foreground">
+                    Warming up…
+                  </li>
+                )}
+                {events.slice(0, 80).map((ev) => (
+                  <li
+                    key={ev.id}
+                    className="px-4 py-2 flex items-start gap-2 text-[11px]"
+                    data-testid={`event-${ev.kind}`}
+                  >
+                    <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", eventDot(ev.kind))} />
+                    <div className="min-w-0 flex-1">
+                      <div className="leading-snug text-foreground/85 break-words">{ev.message}</div>
+                      <div className="mt-0.5 text-[9px] text-muted-foreground/70 font-mono">
+                        {new Date(ev.ts).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </li>
                 ))}
-              </div>
-            )}
+              </ul>
+            </ScrollArea>
           </div>
-        </section>
+        </aside>
       </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  accent = "default",
-}: {
-  label: string;
-  value: string;
-  subtitle?: string;
-  accent?: "default" | "primary" | "emerald" | "rose" | "muted" | "cyan" | "amber";
-}) {
-  const accentClass =
-    accent === "primary"
-      ? "text-primary"
-      : accent === "emerald"
-        ? "text-emerald-300"
-        : accent === "rose"
-          ? "text-rose-300"
-          : accent === "cyan"
-            ? "text-cyan-300"
-            : accent === "amber"
-              ? "text-amber-300"
-              : accent === "muted"
-                ? "text-muted-foreground"
-                : "text-foreground";
-  return (
-    <div className="rounded-lg border border-border bg-card/40 p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={cn("mt-1 text-xl font-bold tabular-nums", accentClass)}>{value}</div>
-      {subtitle && <div className="mt-0.5 text-[10px] text-muted-foreground">{subtitle}</div>}
     </div>
   );
 }

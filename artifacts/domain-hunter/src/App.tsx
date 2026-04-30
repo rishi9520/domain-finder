@@ -1,13 +1,9 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
-import { Home } from "@/pages/home";
 import { Live } from "@/pages/live";
-import { Trends } from "@/pages/trends";
-import { Saved } from "@/pages/saved";
-import { Stats } from "@/pages/stats";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -23,11 +19,10 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Home} />
         <Route path="/live" component={Live} />
-        <Route path="/trends" component={Trends} />
-        <Route path="/saved" component={Saved} />
-        <Route path="/stats" component={Stats} />
+        <Route path="/">
+          <Redirect to="/live" />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>

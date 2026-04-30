@@ -28,12 +28,19 @@ export interface HunterState {
   startedAt: string | null;
   cycle: number;
   totalGenerated: number;
+  totalEvaluated: number;
   totalScoreFiltered: number;
   totalChecked: number;
   totalRegistered: number;
   totalDiscoveries: number;
   totalUnknown: number;
   totalDuplicateSkips: number;
+  totalRdapVerified: number;
+  totalRdapFalsePositives: number;
+  totalRdapUnknown: number;
+  cleanupRunning: boolean;
+  cleanupChecked: number;
+  cleanupRemoved: number;
   currentCategory: string | null;
   currentStrategy: string | null;
   minValueScore: number;
@@ -41,7 +48,12 @@ export interface HunterState {
   starvationStreak: number;
   perStrategy: Record<string, PerBucketStats>;
   perCategory: Record<string, PerBucketStats>;
-  recentNamesSize: number;
+  everSearchedSize: number;
+  recentNamesSize?: number;
+  checksPerSecond: number;
+  evaluatedPerSecond: number;
+  batchSize: number;
+  concurrency: number;
 }
 
 export interface HunterInsights {

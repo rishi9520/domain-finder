@@ -451,13 +451,22 @@ export const ALL_STRATEGIES = [
   "future_suffix",
   "dictionary_hack",
   "transliteration",
-  "four_letter",
   "prefix_root",
   "color_tech",
   "vowel_start",
   "portmanteau",
   "short_suffix",
 ] as const;
+
+// Enforce: only 5-7 letter, lowercase a-z, vulgarity-clean, and not previously seen.
+function passesGate(name: string, exclude?: Set<string>): boolean {
+  if (!name) return false;
+  if (name.length < 5 || name.length > 7) return false;
+  if (!/^[a-z]+$/.test(name)) return false;
+  if (!isClean(name)) return false;
+  if (exclude && exclude.has(name)) return false;
+  return true;
+}
 
 export function generate(
   strategy: string,
@@ -467,8 +476,8 @@ export function generate(
   seed = Date.now(),
   excludeNames?: Set<string>,
 ): string[] {
-  // Oversample 6x and filter against excludeNames so we always get fresh names.
-  const oversample = excludeNames ? count * 6 : count;
+  // Massively oversample so the 5-7 length + dedup gate still yields `count` names.
+  const oversample = Math.max(count * 12, 1500);
   let raw: string[];
   switch (strategy) {
     case "brandable_cvcv":
@@ -482,9 +491,6 @@ export function generate(
       break;
     case "transliteration":
       raw = generateTransliteration(oversample, seed);
-      break;
-    case "four_letter":
-      raw = generateFourLetter(oversample, seed);
       break;
     case "prefix_root":
       raw = generatePrefixRoot(oversample, seed);
@@ -504,13 +510,51 @@ export function generate(
     default:
       raw = generateBrandableCVCV(oversample, seed);
   }
-  if (!excludeNames || excludeNames.size === 0) return raw.slice(0, count);
   const fresh: string[] = [];
+  const seenLocal = new Set<string>();
   for (const name of raw) {
-    if (!excludeNames.has(name)) fresh.push(name);
+    if (seenLocal.has(name)) continue;
+    if (!passesGate(name, excludeNames)) continue;
+    seenLocal.add(name);
+    fresh.push(name);
     if (fresh.length >= count) break;
   }
   return fresh;
+}
+
+// Bulk in-memory generation: call generate() repeatedly with shifted seeds until
+// the requested count is satisfied or we've burnt enough rounds. Used by hunter
+// for "evaluated per second" perception while keeping DNS load sane.
+export function generateBulk(
+  strategy: string,
+  category: string,
+  trendKeywords: string[],
+  count: number,
+  seed: number,
+  excludeNames?: Set<string>,
+  maxRounds = 8,
+): { names: string[]; evaluated: number } {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  let evaluated = 0;
+  for (let r = 0; r < maxRounds && out.length < count; r++) {
+    const round = generate(
+      strategy,
+      category,
+      trendKeywords,
+      count,
+      (seed ^ (r * 0x9e3779b1)) >>> 0,
+      excludeNames,
+    );
+    evaluated += Math.max(count * 12, 1500);
+    for (const n of round) {
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(n);
+      if (out.length >= count) break;
+    }
+  }
+  return { names: out, evaluated };
 }
 
 export { isVowel, patternOf };

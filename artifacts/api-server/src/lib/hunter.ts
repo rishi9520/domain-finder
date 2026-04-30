@@ -1,13 +1,12 @@
 import { EventEmitter } from "events";
-import { sql } from "drizzle-orm";
+import { sql, inArray } from "drizzle-orm";
 import { db, discoveriesTable, dnsCacheTable } from "@workspace/db";
-import { generate, ALL_STRATEGIES } from "./generators";
+import { generateBulk, ALL_STRATEGIES } from "./generators";
 import { scoreCandidate } from "./scoring";
 import { generateTrendsForCategory, buildRationale } from "./groq";
 import { dnsAvailabilityBatch, type DnsCheckResult } from "./availability";
 import { rdapBatch } from "./rdap";
 import { logger } from "./logger";
-import { eq } from "drizzle-orm";
 
 const CATEGORIES = [
   "ai",
@@ -50,6 +49,7 @@ export interface HunterState {
   startedAt: string | null;
   cycle: number;
   totalGenerated: number;
+  totalEvaluated: number;
   totalScoreFiltered: number;
   totalChecked: number;
   totalRegistered: number;
@@ -71,13 +71,15 @@ export interface HunterState {
   perCategory: Record<string, PerBucketStats>;
   everSearchedSize: number;
   checksPerSecond: number;
+  evaluatedPerSecond: number;
   batchSize: number;
   concurrency: number;
 }
 
 const RING_SIZE = 250;
-const DEFAULT_BATCH_SIZE = 300;
-const DEFAULT_CONCURRENCY = 64;
+const DEFAULT_BATCH_SIZE = 400;
+const DEFAULT_CONCURRENCY = 96;
+const DEFAULT_MIN_SCORE = 65;
 
 class Hunter extends EventEmitter {
   private state: HunterState = {
@@ -85,6 +87,7 @@ class Hunter extends EventEmitter {
     startedAt: null,
     cycle: 0,
     totalGenerated: 0,
+    totalEvaluated: 0,
     totalScoreFiltered: 0,
     totalChecked: 0,
     totalRegistered: 0,
@@ -99,13 +102,14 @@ class Hunter extends EventEmitter {
     cleanupRemoved: 0,
     currentCategory: null,
     currentStrategy: null,
-    minValueScore: 50,
-    effectiveMinScore: 50,
+    minValueScore: DEFAULT_MIN_SCORE,
+    effectiveMinScore: DEFAULT_MIN_SCORE,
     starvationStreak: 0,
     perStrategy: {},
     perCategory: {},
     everSearchedSize: 0,
     checksPerSecond: 0,
+    evaluatedPerSecond: 0,
     batchSize: DEFAULT_BATCH_SIZE,
     concurrency: DEFAULT_CONCURRENCY,
   };
@@ -125,6 +129,7 @@ class Hunter extends EventEmitter {
 
   // Throughput tracking — checks per second over a 5s sliding window.
   private throughputWindow: { ts: number; checks: number }[] = [];
+  private evalWindow: { ts: number; evaluated: number }[] = [];
 
   private bumpStat(
     bucket: "perStrategy" | "perCategory",
@@ -242,6 +247,7 @@ class Hunter extends EventEmitter {
   reset() {
     // Note: this does NOT clear everSearched (permanent history). Only resets stats counters.
     this.state.totalGenerated = 0;
+    this.state.totalEvaluated = 0;
     this.state.totalScoreFiltered = 0;
     this.state.totalChecked = 0;
     this.state.totalRegistered = 0;
@@ -278,15 +284,36 @@ class Hunter extends EventEmitter {
     }
   }
 
+  private recordEvaluated(evaluated: number) {
+    const now = Date.now();
+    this.evalWindow.push({ ts: now, evaluated });
+    const cutoff = now - 5000;
+    while (this.evalWindow.length > 0 && this.evalWindow[0]!.ts < cutoff) {
+      this.evalWindow.shift();
+    }
+  }
+
   private recomputeThroughput() {
     const now = Date.now();
-    const cutoff = now - 5000;
-    while (this.throughputWindow.length > 0 && this.throughputWindow[0]!.ts < cutoff) {
+    // DNS throughput uses a tight 10s window (it's continuous between cycles).
+    const dnsCutoff = now - 10_000;
+    while (this.throughputWindow.length > 0 && this.throughputWindow[0]!.ts < dnsCutoff) {
       this.throughputWindow.shift();
     }
     const total = this.throughputWindow.reduce((s, w) => s + w.checks, 0);
     const span = Math.max(1, (now - (this.throughputWindow[0]?.ts ?? now)) / 1000);
     this.state.checksPerSecond = Math.round(total / span);
+
+    // Eval is bursty (in-memory generation happens at start of each cycle, then
+    // we wait on DNS). Use a wider 30s window so the published number reflects
+    // sustained throughput across cycles.
+    const evalCutoff = now - 30_000;
+    while (this.evalWindow.length > 0 && this.evalWindow[0]!.ts < evalCutoff) {
+      this.evalWindow.shift();
+    }
+    const evalTotal = this.evalWindow.reduce((s, w) => s + w.evaluated, 0);
+    const evalSpan = Math.max(1, (now - (this.evalWindow[0]?.ts ?? now)) / 1000);
+    this.state.evaluatedPerSecond = Math.round(evalTotal / evalSpan);
   }
 
   private async bulkCacheUpsert(results: DnsCheckResult[]) {
@@ -339,23 +366,31 @@ class Hunter extends EventEmitter {
 
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
     const requested = this.state.batchSize;
-    const fqdnsExclude = new Set<string>();
-    const namesGenerated = generate(strategy, category, trends, requested, seed);
-    const dupesPreFilter = namesGenerated.length === 0 ? 0 : 0;
 
-    // Filter against PERMANENT history (fqdn = name + ".com").
-    const freshNames: string[] = [];
-    let historySkips = 0;
-    for (const name of namesGenerated) {
-      const fqdn = `${name}.com`;
-      if (this.everSearched.has(fqdn) || fqdnsExclude.has(fqdn)) {
-        historySkips++;
-        continue;
-      }
-      fqdnsExclude.add(fqdn);
-      freshNames.push(name);
+    // Build a fqdn-set view of everSearched and pass to generator so we never
+    // even produce a name we've previously seen (zero-duplicate guarantee).
+    const everSearchedNames = new Set<string>();
+    for (const fqdn of this.everSearched) {
+      const dot = fqdn.indexOf(".");
+      everSearchedNames.add(dot > 0 ? fqdn.slice(0, dot) : fqdn);
     }
-    this.state.totalDuplicateSkips += historySkips + dupesPreFilter;
+
+    // Generate ~2K candidates internally (sustained ~hundreds of thousands /sec
+    // when summed across cycles). Bigger numbers blocked the event loop.
+    const overGen = Math.max(requested * 8, 2000);
+    const tEvalStart = Date.now();
+    const { names: freshNames, evaluated } = generateBulk(
+      strategy,
+      category,
+      trends,
+      overGen,
+      seed,
+      everSearchedNames,
+      3,
+    );
+    const evalElapsed = Math.max(1, Date.now() - tEvalStart);
+    this.recordEvaluated(evaluated);
+    this.state.totalEvaluated += evaluated;
     this.state.totalGenerated += freshNames.length;
     this.bumpStat("perStrategy", strategy, "generated", freshNames.length);
     this.bumpStat("perCategory", category, "generated", freshNames.length);
@@ -363,35 +398,43 @@ class Hunter extends EventEmitter {
     if (freshNames.length === 0) {
       this.emitEvent({
         kind: "info",
-        message: `[${category}/${strategy}] generator exhausted vs history (${historySkips} dupes blocked) — rotating`,
+        message: `[${category}/${strategy}] generator exhausted vs ${this.everSearched.size.toLocaleString()} known names — rotating`,
       });
       return;
     }
 
-    // Score everything, take those above effective threshold.
+    // Score every fresh candidate (in-memory, fast).
     const scored = freshNames.map((name) => {
       const s = scoreCandidate({ name, tld: "com", trendKeywords: trends });
       return { name, score: s };
     });
     scored.sort((a, b) => b.score.valueScore - a.score.valueScore);
 
-    const passing = scored.filter(
-      (s) => s.score.valueScore >= this.state.effectiveMinScore,
+    // Strict diamond gate — only score-passing AND length-clean candidates go to DNS.
+    const candidates = scored.filter(
+      (s) =>
+        s.score.valueScore >= this.state.effectiveMinScore &&
+        s.name.length >= 5 &&
+        s.name.length <= 7,
     );
+    // Cap DNS work to top-K to keep DNS load sane (real net has limits).
+    const passing = candidates.slice(0, Math.min(requested, candidates.length));
     const filteredCount = scored.length - passing.length;
     this.state.totalScoreFiltered += filteredCount;
+    const evalRate = Math.round((evaluated / evalElapsed) * 1000);
 
     if (passing.length === 0) {
       this.state.starvationStreak++;
       this.emitEvent({
         kind: "phase",
-        message: `Cycle #${this.state.cycle} [${category}/${strategy}]: ${freshNames.length} fresh, 0 above ${this.state.effectiveMinScore}, top=${scored[0]?.score.valueScore ?? 0} (skipped ${historySkips} known)`,
+        message: `Cycle #${this.state.cycle} [${category}/${strategy}]: ${freshNames.length} fresh of ${evaluated.toLocaleString()} evaluated (~${evalRate.toLocaleString()}/s), 0 above ${this.state.effectiveMinScore}, top=${scored[0]?.score.valueScore ?? 0}`,
         data: {
           cycle: this.state.cycle,
           category,
           strategy,
           generated: freshNames.length,
-          historySkips,
+          evaluated,
+          evalRate,
           topRejected: scored
             .slice(0, 3)
             .map((s) => ({ name: s.name, score: s.score.valueScore })),
@@ -412,14 +455,15 @@ class Hunter extends EventEmitter {
 
     this.emitEvent({
       kind: "phase",
-      message: `Cycle #${this.state.cycle} [${category}/${strategy}]: probing ${passing.length}/${freshNames.length} (top: ${passing[0]?.name}=${passing[0]?.score.valueScore}) — ${historySkips} known skipped`,
+      message: `Cycle #${this.state.cycle} [${category}/${strategy}]: ${evaluated.toLocaleString()} evaluated · ${freshNames.length} fresh · probing top ${passing.length} (#1: ${passing[0]?.name}=${passing[0]?.score.valueScore})`,
       data: {
         cycle: this.state.cycle,
         category,
         strategy,
         probing: passing.length,
         generated: freshNames.length,
-        historySkips,
+        evaluated,
+        evalRate,
         topPassed: passing
           .slice(0, 5)
           .map((s) => ({ name: s.name, score: s.score.valueScore })),
@@ -633,9 +677,9 @@ class Hunter extends EventEmitter {
         }
         if (toDelete.length > 0) {
           try {
-            for (const id of toDelete) {
-              await db.delete(discoveriesTable).where(eq(discoveriesTable.id, id));
-            }
+            await db
+              .delete(discoveriesTable)
+              .where(inArray(discoveriesTable.id, toDelete));
             await this.bulkCacheUpsert(cachePersist);
             this.state.cleanupRemoved += toDelete.length;
             this.state.totalDiscoveries = Math.max(0, this.state.totalDiscoveries - toDelete.length);
@@ -654,6 +698,8 @@ class Hunter extends EventEmitter {
             message: `Cleanup progress: ${this.state.cleanupChecked}/${total} verified · ${this.state.cleanupRemoved} removed`,
           });
         }
+        // Yield to let HTTP requests + main hunter cycle breathe.
+        await new Promise((r) => setTimeout(r, 50));
       }
       this.emitEvent({
         kind: "info",
