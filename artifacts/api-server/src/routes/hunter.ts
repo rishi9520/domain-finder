@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { desc, sql, and, gte, eq } from "drizzle-orm";
 import { db, discoveriesTable, type DiscoveryRow } from "@workspace/db";
 import { hunter } from "../lib/hunter";
+import { testTelegramConnection } from "../lib/telegram";
 
 const router: IRouter = Router();
 
@@ -86,6 +87,11 @@ router.post("/hunter/reset", (_req, res): void => {
 
 router.get("/hunter/insights", (_req, res): void => {
   res.json(hunter.getInsights());
+});
+
+router.post("/hunter/telegram-test", async (_req, res): Promise<void> => {
+  const result = await testTelegramConnection();
+  res.json(result);
 });
 
 router.get("/hunter/stream", (req: Request, res: Response): void => {

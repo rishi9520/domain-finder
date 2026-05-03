@@ -7,6 +7,9 @@ import { generateTrendsForCategory, buildRationale } from "./groq";
 import { dnsAvailabilityBatch, type DnsCheckResult } from "./availability";
 import { rdapBatch } from "./rdap";
 import { logger } from "./logger";
+import { queueTelegramAlert, sendStartupAlert } from "./telegram";
+
+const TELEGRAM_ALERT_THRESHOLD = 96;
 
 const CATEGORIES = [
   "ai",
@@ -235,6 +238,12 @@ class Hunter extends EventEmitter {
       kind: "info",
       message: `Hunter armed — ${this.everSearched.size.toLocaleString()} names already in history. batch=${this.state.batchSize} concurrency=${this.state.concurrency} min=${this.state.minValueScore}`,
     });
+    // Fire startup Telegram notification (non-blocking).
+    void db
+      .select({ c: sql<number>`count(*)::int` })
+      .from(discoveriesTable)
+      .then((r) => sendStartupAlert(r[0]?.c ?? 0))
+      .catch(() => {});
     void this.loop();
   }
 
@@ -607,6 +616,26 @@ class Hunter extends EventEmitter {
               breakdown: d.score.breakdown,
             },
           });
+          // 🔔 Telegram alert for elite diamonds only (≥96 score)
+          if (d.score.valueScore >= TELEGRAM_ALERT_THRESHOLD) {
+            queueTelegramAlert({
+              name: d.name,
+              fqdn: d.fqdn,
+              category,
+              strategy,
+              valueScore: d.score.valueScore,
+              pattern: d.score.pattern,
+              rationale: buildRationale({
+                name: d.name,
+                tld: "com",
+                category,
+                strategy,
+                pattern: d.score.pattern,
+                valueScore: d.score.valueScore,
+              }),
+              dnsEvidence: d.result.evidence,
+            });
+          }
         }
         if (newDiamonds.length > 8) {
           this.emitEvent({

@@ -200,6 +200,12 @@ export interface DiscoveriesResponse {
   items: Discovery[];
 }
 
+export async function testTelegram(): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${API_BASE}/hunter/telegram-test`, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as { ok: boolean; error?: string };
+}
+
 export async function fetchDiscoveries(params: {
   limit?: number;
   offset?: number;

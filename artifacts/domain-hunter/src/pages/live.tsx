@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  Bell,
+  BellRing,
   CheckCircle2,
   ChevronDown,
   Copy,
@@ -29,6 +31,7 @@ import {
   resetHunterMemory,
   startHunter,
   stopHunter,
+  testTelegram,
   useHunterStream,
   type Discovery,
   type HunterEvent,
@@ -63,6 +66,8 @@ const STRATEGY_LABEL: Record<string, string> = {
   brandable_cvcv: "Brandable CVCV",
   future_suffix: "Future Suffix",
   dictionary_hack: "Dictionary Hack",
+  two_word_brandable: "Two-Word Brand",
+  pronounceable_word: "Dictionary Word",
   transliteration: "Transliteration",
   prefix_root: "Prefix-Root",
   color_tech: "Color-Tech",
@@ -328,6 +333,7 @@ export function Live() {
   const [lengthFilter, setLengthFilter] = useState<number | null>(null);
   const [offset, setOffset] = useState(0);
   const [allItems, setAllItems] = useState<Discovery[]>([]);
+  const [telegramStatus, setTelegramStatus] = useState<"idle" | "testing" | "ok" | "error">("idle");
   const queryClient = useQueryClient();
   const filtersKey = `${minScore}-${category}-${String(lengthFilter)}`;
   const prevFiltersKeyRef = useRef(filtersKey);
@@ -409,6 +415,18 @@ export function Live() {
     exportCsv(allItems);
   }, [allItems]);
 
+  const handleTelegramTest = useCallback(async () => {
+    setTelegramStatus("testing");
+    try {
+      const result = await testTelegram();
+      setTelegramStatus(result.ok ? "ok" : "error");
+      setTimeout(() => setTelegramStatus("idle"), 5000);
+    } catch {
+      setTelegramStatus("error");
+      setTimeout(() => setTelegramStatus("idle"), 5000);
+    }
+  }, []);
+
   return (
     <div className="px-6 py-6 max-w-[1500px] mx-auto">
       {/* Header */}
@@ -438,6 +456,29 @@ export function Live() {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            onClick={() => void handleTelegramTest()}
+            size="sm"
+            variant="outline"
+            disabled={telegramStatus === "testing"}
+            className={cn(
+              "border transition-all",
+              telegramStatus === "ok" ? "border-emerald-400/60 text-emerald-300 bg-emerald-500/10" :
+              telegramStatus === "error" ? "border-rose-400/60 text-rose-300 bg-rose-500/10" :
+              "border-sky-400/40 text-sky-300 hover:bg-sky-500/10",
+            )}
+            title="Test Telegram bot — sends a test message to your Telegram"
+          >
+            {telegramStatus === "testing" ? (
+              <><Bell className="mr-1 h-3.5 w-3.5 animate-pulse" /> Connecting…</>
+            ) : telegramStatus === "ok" ? (
+              <><BellRing className="mr-1 h-3.5 w-3.5" /> Telegram ✓</>
+            ) : telegramStatus === "error" ? (
+              <><Bell className="mr-1 h-3.5 w-3.5" /> Alert Error</>
+            ) : (
+              <><Bell className="mr-1 h-3.5 w-3.5" /> Test Alerts</>
+            )}
+          </Button>
+          <Button
             onClick={handleResetMemory}
             size="sm"
             variant="outline"
@@ -447,7 +488,7 @@ export function Live() {
             <Trash2 className="mr-1 h-3.5 w-3.5" /> Reset counters
           </Button>
           <Button
-            onClick={handleToggle}
+            onClick={() => void handleToggle()}
             size="sm"
             variant={running ? "outline" : "default"}
             className={cn(

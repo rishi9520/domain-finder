@@ -425,10 +425,210 @@ export function generateShortSuffix(count: number, seed = Date.now()): string[] 
   return Array.from(out);
 }
 
+// ─────────────────────────────────────────────
+// TWO-WORD BRANDABLE — real dictionary words fused into 5-7 letter gems
+// e.g. deepmind, novanet, swiftai, vaultix, primelab
+// ─────────────────────────────────────────────
+const WORD1_POWER = [
+  // Action / movement
+  "swift", "bold", "pure", "peak", "flux", "nova", "apex", "core",
+  "deep", "edge", "high", "open", "true", "base", "beam", "leap",
+  "sharp", "smart", "bright", "clear", "fast", "keen", "wide",
+  // Nature / elements
+  "sun", "sky", "sea", "fire", "wave", "wind", "rock", "root",
+  "leaf", "seed", "star", "moon", "glow", "dawn", "dusk", "mist",
+  // Premium feel
+  "prime", "gem", "rare", "rich", "fine", "gilt", "gold", "mint",
+  "pure", "silk", "zen", "key", "neo", "arc", "ace", "era",
+  // Tech signals
+  "bit", "byte", "code", "data", "grid", "hub", "ion", "lab",
+  "net", "node", "ray", "sync", "vec", "web", "ai", "log",
+];
+
+const WORD2_POWER = [
+  // Company endings
+  "lab", "labs", "hub", "hq", "co", "io",
+  // Tech roots
+  "core", "node", "flux", "grid", "sync", "wave", "link", "path",
+  "base", "gate", "port", "mesh", "loop", "edge", "flow", "stack",
+  "byte", "bit", "kit", "bot", "ify", "ize", "ify",
+  // Brandable endings
+  "ify", "ize", "zen", "ven", "gen", "len", "den", "pen",
+  "lex", "vex", "nex", "rex", "hex", "tex", "flex",
+  "ara", "era", "ira", "ora", "ura",
+  "ify", "ble", "tic", "ric", "nic", "mic",
+  "mind", "view", "way", "bay", "ray", "day",
+  "ry", "ly", "vy", "py", "ty", "gy",
+];
+
+export function generateTwoWordBrandable(count: number, seed = Date.now()): string[] {
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 60) {
+    attempts++;
+    const w1 = pick(WORD1_POWER, rng);
+    const w2 = pick(WORD2_POWER, rng);
+    // fuse: try full concat and truncated versions
+    const fused = (w1 + w2).toLowerCase().replace(/[^a-z]/g, "");
+    const candidates = [
+      fused,
+      fused.slice(0, 7),
+      // Drop last vowel of w1 if makes it shorter
+      ...(isVowel(w1[w1.length - 1] ?? "") ? [(w1.slice(0, -1) + w2).slice(0, 7)] : []),
+    ];
+    for (const candidate of candidates) {
+      if (
+        candidate.length >= 5 &&
+        candidate.length <= 7 &&
+        /^[a-z]+$/.test(candidate) &&
+        !hasAwkwardCluster(candidate) &&
+        isClean(candidate)
+      ) {
+        out.add(candidate);
+        if (out.size >= count) break;
+      }
+    }
+  }
+  return Array.from(out);
+}
+
+// ─────────────────────────────────────────────
+// PRONOUNCEABLE REAL WORDS — dictionary-style names
+// actual recognizable English words that happen to be 5-7 letters
+// ─────────────────────────────────────────────
+const PRONOUNCEABLE_BASES = [
+  // Strong 5-letter real words
+  "alter", "ambit", "axiom", "blaze", "blend", "bloom", "bound", "brave",
+  "break", "brief", "brisk", "broad", "build", "burst", "clean", "clear",
+  "climb", "craft", "crest", "crisp", "cross", "crown", "curve", "cycle",
+  "delta", "dense", "depth", "digit", "draft", "drift", "drive", "drone",
+  "elite", "ember", "empower", "epoch", "evoke", "exact", "exalt",
+  "flair", "flame", "flare", "flash", "fleet", "float", "focus", "forge",
+  "forth", "frame", "fresh", "front", "frost", "froze",
+  "globe", "glyph", "grace", "grade", "grant", "grasp", "graze", "grind",
+  "grove", "guard", "guide", "guild",
+  "haven", "helix", "hinge", "hoist", "hyper",
+  "ideal", "image", "imply", "index", "infer", "inter", "intro",
+  "karma", "krypt",
+  "lance", "laser", "layer", "learn", "ledge", "light", "limit", "local",
+  "logic", "lotus", "loyal", "lucid", "lunar", "lusty",
+  "magic", "maker", "maple", "match", "medic", "merge", "merit", "model",
+  "morph", "mount", "mover", "myrrh",
+  "nexus", "noble", "north", "notch",
+  "octal", "optic", "orbit", "order", "ought",
+  "panel", "parse", "patch", "petal", "phase", "pilot", "pixel", "pivot",
+  "place", "plain", "plane", "plant", "plaza", "polar", "power", "prime",
+  "prism", "proof", "prose", "proud", "pulse",
+  "quant", "query", "quest", "quick",
+  "radar", "radio", "raise", "range", "rapid", "ratio", "reach", "realm",
+  "relay", "repro", "reset", "ridge", "rigel", "rivet", "rogue",
+  "scale", "scene", "scout", "scythe", "serum", "seven", "shade", "shaft",
+  "shale", "shift", "shore", "sigma", "sight", "sigma", "signal", "silex",
+  "slate", "sleek", "slide", "slope", "smart", "solar", "solid", "solve",
+  "sonic", "sonar", "spark", "speed", "spend", "spire", "split", "spore",
+  "squad", "stage", "stake", "steel", "stern", "store", "storm", "story",
+  "strap", "stray", "strip", "style", "surge", "synth",
+  "tapir", "tempo", "terra", "tesla", "theta", "three", "trace", "track",
+  "trade", "trail", "trait", "triad", "tribe", "tried", "trust",
+  "ultra", "unity", "uplift", "urban",
+  "valid", "valor", "value", "vault", "venom", "verve", "visor", "vista",
+  "vital", "vivid", "vocal", "voice", "voila", "volts",
+  "watch", "weave", "wedge", "whole", "wider",
+  "xenon", "xerox",
+  "yield", "young",
+  "zeal", "zeist", "zephyr", "zilch", "zippy", "zombi", "zonal",
+  // 6-letter gems
+  "advent", "agile", "alpine", "altair", "ampere", "amulet", "anchor",
+  "annex", "antler", "arcane", "arcing", "ardent", "argent", "aright",
+  "artery", "astral", "atomic", "attain", "augment",
+  "beacon", "binary", "biosyn", "blazer", "blazon", "bonded", "bonsai",
+  "bridge", "bright", "brigand",
+  "canopy", "carbon", "cellar", "cement", "cipher", "citadel", "citrus",
+  "cobalt", "codify", "collab", "comet", "compel", "convex", "copper",
+  "corona", "cortex", "cosmic", "credit", "cursor",
+  "darken", "define", "deploy", "design", "detect", "devote", "direct",
+  "domain", "domino", "dynamo",
+  "efface", "effect", "effort", "embark", "enable", "engage", "enigma",
+  "enrich", "entire", "evolve", "exceed", "expand", "export", "extend",
+  "extol",
+  "fathom", "ferret", "filter", "finesse", "floret", "flumen", "format",
+  "fossil", "fractil", "fractal", "fusion",
+  "galena", "garden", "garner", "gather", "gemini", "gentle", "global",
+  "goblin", "google", "gothic", "gravis",
+  "harbor", "hardex", "herald", "heron", "holism", "hybrid",
+  "ignite", "impact", "import", "improv", "input", "instal", "intact",
+  "intuit", "invent",
+  "jetset", "jitter", "joiner", "journey",
+  "kaleid", "kaizen", "kernel", "kindra", "kinect",
+  "lancer", "lander", "legend", "liftup", "linear", "linker", "liquid",
+  "lumens", "lumina", "luminex",
+  "magnet", "marine", "marker", "matrix", "mentor", "meteor", "method",
+  "metric", "midway", "mirror", "mobile", "modular", "molten", "mortem",
+  "motion", "motive", "murmur", "mutant",
+  "narian", "neural", "nimbus", "notion",
+  "object", "obtain", "octane", "offset", "online", "opener", "operon",
+  "oracle", "orange", "origin", "outrun",
+  "parcel", "patent", "paxion", "permit", "petrol", "photon", "pillar",
+  "pinion", "planet", "plasma", "platen", "playon", "pledge", "plugin",
+  "podium", "pollex", "portal", "poster", "potent", "precis", "prefix",
+  "premia", "premix", "preset", "proton", "proven",
+  "quasar", "quorum",
+  "radial", "radius", "raider", "random", "rankle", "recall", "refine",
+  "reform", "render", "retype", "reveal", "revert", "ridley", "rigour",
+  "ringet", "rocket", "router", "runner",
+  "scalar", "schema", "sector", "select", "sensor", "series", "server",
+  "signal", "simple", "sintra", "sketch", "soften", "solver", "source",
+  "sphinx", "spiral", "sprint", "stable", "static", "status", "stoker",
+  "stream", "strict", "stride", "string", "strobe", "struct", "studio",
+  "submit", "subtle", "summit", "supply", "switch", "symbol", "system",
+  "target", "tensor", "thrive", "ticket", "toggle", "tokeni", "torque",
+  "tracer", "trance", "transit", "triple", "triton", "tunnel", "turbin",
+  "united", "update", "uplink", "upside", "usable",
+  "vector", "vendor", "verify", "vertex", "virago", "virtue", "vision",
+  "visitor", "visual", "vortex",
+  "wayfar", "widget", "winter", "wisdom",
+  "xylite", "xylene",
+  "yantra", "yonder",
+  "zaftig", "zealis", "zenith", "zephyr",
+];
+
+export function generatePronounceableWord(count: number, seed = Date.now()): string[] {
+  const rng = makeRng(seed);
+  const out = new Set<string>();
+  let attempts = 0;
+  while (out.size < count && attempts < count * 30) {
+    attempts++;
+    const base = pick(PRONOUNCEABLE_BASES, rng);
+    // keep pure base if 5-7 letters, else try truncation / light morph
+    const variants: string[] = [];
+    if (base.length >= 5 && base.length <= 7) variants.push(base);
+    if (base.length > 7) variants.push(base.slice(0, 7), base.slice(0, 6), base.slice(0, 5));
+    // Optionally fuse with a 2-3 letter power ending
+    const endings = ["ix", "ax", "ex", "ox", "ux", "io", "ai", "iq", "ly", "ry"];
+    if (base.length <= 5) variants.push((base + pick(endings, rng)).slice(0, 7));
+    for (const v of variants) {
+      const clean = v.toLowerCase().replace(/[^a-z]/g, "");
+      if (
+        clean.length >= 5 &&
+        clean.length <= 7 &&
+        !hasAwkwardCluster(clean) &&
+        isClean(clean)
+      ) {
+        out.add(clean);
+        if (out.size >= count) break;
+      }
+    }
+  }
+  return Array.from(out);
+}
+
 export const ALL_STRATEGIES = [
   "brandable_cvcv",
   "future_suffix",
   "dictionary_hack",
+  "two_word_brandable",
+  "pronounceable_word",
   "transliteration",
   "prefix_root",
   "color_tech",
@@ -484,6 +684,12 @@ export function generate(
       break;
     case "short_suffix":
       raw = generateShortSuffix(oversample, seed);
+      break;
+    case "two_word_brandable":
+      raw = generateTwoWordBrandable(oversample, seed);
+      break;
+    case "pronounceable_word":
+      raw = generatePronounceableWord(oversample, seed);
       break;
     default:
       raw = generateBrandableCVCV(oversample, seed);
