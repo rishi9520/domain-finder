@@ -195,18 +195,24 @@ export interface Discovery {
 
 export interface DiscoveriesResponse {
   total: number;
+  offset: number;
+  limit: number;
   items: Discovery[];
 }
 
 export async function fetchDiscoveries(params: {
   limit?: number;
+  offset?: number;
   minScore?: number;
   category?: string;
+  length?: number | null;
 }): Promise<DiscoveriesResponse> {
   const qs = new URLSearchParams();
   if (params.limit != null) qs.set("limit", String(params.limit));
+  if (params.offset != null && params.offset > 0) qs.set("offset", String(params.offset));
   if (params.minScore != null) qs.set("minScore", String(params.minScore));
-  if (params.category) qs.set("category", params.category);
+  if (params.category && params.category !== "all") qs.set("category", params.category);
+  if (params.length != null) qs.set("length", String(params.length));
   const res = await fetch(`${API_BASE}/discoveries?${qs.toString()}`);
   if (!res.ok) throw new Error(`Failed: ${res.status}`);
   return (await res.json()) as DiscoveriesResponse;

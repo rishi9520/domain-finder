@@ -1,6 +1,8 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { hunter } from "./lib/hunter";
+import { db, discoveriesTable } from "@workspace/db";
+import { desc } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
@@ -33,5 +35,14 @@ app.listen(port, (err) => {
       .catch((err) => logger.error({ err }, "Hunter auto-arm failed"));
     // Kick off a one-shot RDAP re-verification of legacy diamonds in background.
     void hunter.runLegacyCleanup();
+
+    // Warm the DB query plan so the first user-facing discoveries request is fast.
+    void db
+      .select({ id: discoveriesTable.id })
+      .from(discoveriesTable)
+      .orderBy(desc(discoveriesTable.valueScore))
+      .limit(1)
+      .then(() => logger.info({}, "DB query plan warmed"))
+      .catch(() => {/* ignore */});
   }, 500);
 });

@@ -1,50 +1,11 @@
 import { isVowel, hasAwkwardCluster, patternOf } from "./scoring";
 
 const BLOCKED_FRAGMENTS = [
-  "fuck",
-  "fuk",
-  "fuq",
-  "shit",
-  "cunt",
-  "dick",
-  "cock",
-  "pussy",
-  "bitch",
-  "nigg",
-  "rape",
-  "porn",
-  "anal",
-  "anus",
-  "tits",
-  "boob",
-  "slut",
-  "whore",
-  "fag",
-  "homo",
-  "kkk",
-  "nazi",
-  "kike",
-  "spic",
-  "chink",
-  "hitler",
-  "isis",
-  "jihad",
-  "kill",
-  "die",
-  "dead",
-  "suck",
-  "ugly",
-  "scam",
-  "fraud",
-  "spam",
-  "junk",
-  "trash",
-  "vagina",
-  "penis",
-  "sex",
-  "xxx",
-  "loli",
-  "incest",
+  "fuck", "fuk", "fuq", "shit", "cunt", "dick", "cock", "pussy", "bitch",
+  "nigg", "rape", "porn", "anal", "anus", "tits", "boob", "slut", "whore",
+  "fag", "homo", "kkk", "nazi", "kike", "spic", "chink", "hitler", "isis",
+  "jihad", "kill", "die", "dead", "suck", "ugly", "scam", "fraud", "spam",
+  "junk", "trash", "vagina", "penis", "sex", "xxx", "loli", "incest",
 ];
 
 function isClean(name: string): boolean {
@@ -59,51 +20,6 @@ const CONSONANTS = "bcdfghjklmnpqrstvwxyz".split("");
 const PRIMARY_CONS = "bdfgklmnprstvz".split("");
 const VOWELS_LIST = "aeiou".split("");
 
-const FUTURE_SUFFIXES: Record<string, string[]> = {
-  ai: ["mind", "sync", "core", "logic", "neural", "vertex", "nexus", "pulse"],
-  quantum: ["qbit", "qore", "wave", "node", "grid", "vertex", "layer"],
-  biotech: ["bio", "gene", "cell", "vita", "lyte", "zoa", "morph"],
-  green_energy: ["volt", "grid", "pulse", "flux", "solr", "leaf", "loop"],
-  space_tech: ["orbit", "warp", "nova", "quasr", "comet", "stellr", "void"],
-};
-
-const FUTURE_PREFIXES: Record<string, string[]> = {
-  ai: ["neural", "cog", "synap", "deep", "axion"],
-  quantum: ["qore", "qubo", "entangl", "wave", "axiq"],
-  biotech: ["geno", "cyto", "helix", "nucl", "myco"],
-  green_energy: ["eco", "verd", "lume", "sol", "kine"],
-  space_tech: ["astra", "orbi", "nebu", "lumen", "exo"],
-};
-
-const TRANSLIT_ROOTS = [
-  "dhanda",
-  "vega",
-  "tejas",
-  "agni",
-  "indra",
-  "shakti",
-  "rapid",
-  "veloz",
-  "vita",
-  "lumen",
-  "siempre",
-  "alma",
-  "fuego",
-  "nuevo",
-  "primo",
-];
-
-const TRANSLIT_SUFFIXES = [
-  "ola",
-  "ify",
-  "io",
-  "ly",
-  "go",
-  "kart",
-  "mind",
-  "wave",
-];
-
 function pick<T>(arr: T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)] as T;
 }
@@ -116,6 +32,143 @@ function makeRng(seed: number): () => number {
   };
 }
 
+// Apply 0-2 character-level mutations to a base string, creating near-infinite
+// variation from finite vocabulary lists.
+function morphed(base: string, rng: () => number, ops = 1): string {
+  let s = base;
+  for (let i = 0; i < ops; i++) {
+    const op = rng();
+    if (s.length === 0) break;
+    if (op < 0.30 && s.length > 4) {
+      // delete a random char
+      const pos = Math.floor(rng() * s.length);
+      s = s.slice(0, pos) + s.slice(pos + 1);
+    } else if (op < 0.55 && s.length < 8) {
+      // insert a phonetically balanced char
+      const pos = 1 + Math.floor(rng() * (s.length - 1));
+      const prev = s[pos - 1] ?? "";
+      const ch = isVowel(prev) ? pick(PRIMARY_CONS, rng) : pick(VOWELS_LIST, rng);
+      s = s.slice(0, pos) + ch + s.slice(pos);
+    } else {
+      // replace a char in-place with same phonetic class
+      const pos = Math.floor(rng() * s.length);
+      const cur = s[pos] ?? "";
+      const ch = isVowel(cur) ? pick(VOWELS_LIST, rng) : pick(PRIMARY_CONS, rng);
+      s = s.slice(0, pos) + ch + s.slice(pos + 1);
+    }
+  }
+  return s.replace(/[^a-z]/g, "");
+}
+
+// ─────────────────────────────────────────────
+// FUTURE SUFFIX
+// ─────────────────────────────────────────────
+const FUTURE_SUFFIXES: Record<string, string[]> = {
+  ai: ["mind", "sync", "core", "logic", "neural", "vertex", "nexus", "pulse", "sense", "vex", "node", "flux", "iq", "bit", "fy", "lex", "nix", "bot"],
+  quantum: ["qbit", "qore", "wave", "node", "grid", "vertex", "layer", "leap", "flux", "spin", "gate", "orbit", "pair", "onic"],
+  biotech: ["bio", "gene", "cell", "vita", "lyte", "zoa", "morph", "base", "helix", "codon", "lyze", "form", "mab", "fect"],
+  green_energy: ["volt", "grid", "pulse", "flux", "solr", "leaf", "loop", "gen", "gy", "cell", "watt", "eco", "reen", "sun"],
+  space_tech: ["orbit", "warp", "nova", "quasr", "comet", "stellr", "void", "nav", "lyze", "axia", "exo", "grav", "vec"],
+};
+
+const FUTURE_PREFIXES: Record<string, string[]> = {
+  ai: ["neural", "cog", "synap", "deep", "axion", "algo", "deno", "infr", "geni", "corp", "neur", "lumo", "vect", "kera"],
+  quantum: ["qore", "qubo", "entangl", "wave", "axiq", "qura", "quanta", "quasar", "qnum", "qlink", "qphi"],
+  biotech: ["geno", "cyto", "helix", "nucl", "myco", "prion", "amylo", "meso", "macro", "micro", "nano", "pico"],
+  green_energy: ["eco", "verd", "lume", "sol", "kine", "helios", "zeph", "terra", "viro", "atmo", "carbo"],
+  space_tech: ["astra", "orbi", "nebu", "lumen", "exo", "cosmo", "galac", "lunar", "helio", "xeno", "axia"],
+};
+
+// ─────────────────────────────────────────────
+// TRANSLITERATION — massively expanded
+// ─────────────────────────────────────────────
+const TRANSLIT_ROOTS = [
+  // Sanskrit / Hindi-origin
+  "agni", "indra", "shakti", "tejas", "dharma", "veda", "surya", "karma",
+  "prana", "akash", "vajra", "chandra", "arya", "rudra", "naga", "soma",
+  "mitra", "kama", "kali", "deva", "yuga", "rasa", "sura", "vira",
+  "maya", "tara", "danu", "manu", "rishi", "siddhi", "tantra", "yantra",
+  // Spanish / Latin-origin
+  "vega", "vita", "lumen", "alma", "fuego", "nuevo", "primo", "terra",
+  "luna", "solar", "aqua", "forma", "porta", "campo", "vivo", "modo",
+  "recto", "fiero", "bravo", "claro", "libre", "puro", "nivel", "mundo",
+  // Japanese-origin short roots
+  "kira", "nori", "yuki", "hana", "sora", "kaze", "umi", "tori", "mori",
+  "shiro", "kuro", "neko", "tama", "furi", "yume", "mika", "ryuu",
+  // Arabic-origin
+  "noor", "alam", "hakim", "rafi", "zara", "amir", "badr", "nasr",
+  "wafi", "amin", "hani", "sami", "adil", "faiz", "riza", "wali",
+  // Greek-origin tech morphemes
+  "aeon", "bios", "gaia", "helio", "kosmo", "logos", "nomo", "onyx",
+  "phos", "rheo", "synth", "telos", "xeno", "zeta", "plex", "naut",
+];
+
+const TRANSLIT_SUFFIXES = [
+  "ola", "ify", "io", "ly", "go", "kart", "mind", "wave", "iq",
+  "ex", "ix", "ox", "ax", "an", "on", "in", "un", "en",
+  "us", "or", "ar", "er", "ia", "ya", "aya", "ora", "ura",
+  "ika", "ika", "aka", "eka", "oka", "uka",
+  "fy", "vy", "zy", "py", "ty",
+  "ael", "iel", "uel", "eel",
+];
+
+// ─────────────────────────────────────────────
+// PREFIX-ROOT — vastly expanded with morphing
+// ─────────────────────────────────────────────
+const PREMIUM_PREFIXES = [
+  "neo", "meta", "syn", "omni", "hyper", "ultra", "para", "proto",
+  "trans", "infra", "exo", "endo", "cyber", "bio", "geo", "helio",
+  "lumin", "vivo", "auro", "kine", "tera", "nano", "pico", "giga",
+  "mega", "zeta", "peta", "atto", "quant", "virt", "algo", "auto",
+  "moto", "loco", "colo", "digi", "tele", "poly", "mono", "duo",
+  "tri", "quad", "hex", "octo", "deca", "multi", "inter", "intra",
+  "supra", "sub", "super", "over", "under", "cross", "co", "pre",
+  "post", "re", "de", "un", "semi", "pseudo", "quasi", "anti",
+];
+
+const PREMIUM_ROOTS = [
+  "core", "labs", "node", "wave", "loop", "flux", "form", "stack",
+  "grid", "pulse", "field", "mesh", "cell", "byte", "sense", "cast",
+  "scope", "tide", "spark", "drift", "shift", "axis", "orbit", "vector",
+  "link", "sync", "flow", "base", "gate", "path", "port", "hub",
+  "edge", "line", "mark", "mint", "nest", "peak", "pit", "plan",
+  "plot", "pod", "point", "rack", "rail", "ray", "reef", "ring",
+  "root", "route", "row", "run", "scale", "seal", "seat", "seed",
+  "set", "side", "sign", "site", "skill", "slot", "smart", "snap",
+  "sort", "span", "spec", "spin", "spot", "spread", "stem", "step",
+  "stone", "store", "stream", "stride", "strip", "sum", "swap",
+  "tag", "tap", "task", "team", "term", "text", "tick", "tile",
+  "tip", "tool", "top", "track", "trail", "trait", "tree", "trend",
+  "trip", "trunk", "tube", "turn", "type", "unit", "use", "vault",
+  "view", "vine", "void", "volt", "walk", "wall", "web", "wire",
+  "work", "world", "wrap", "yard", "zone",
+];
+
+// ─────────────────────────────────────────────
+// COLOR-TECH — expanded
+// ─────────────────────────────────────────────
+const COLOR_TECH = [
+  "lumi", "vivid", "prism", "aqua", "ember", "azure", "indigo", "amber",
+  "ivory", "neon", "violet", "crimson", "ochre", "saffron", "onyx",
+  "obsid", "ceru", "coral", "olive", "opal", "perl", "ruby", "sage",
+  "slate", "teal", "umber", "jade", "topaz", "garnet", "sepia",
+  "cobalt", "sienna", "khaki", "ecru", "fawn", "lilac", "mauve",
+  "peach", "plum", "rose", "taupe", "tawny", "virid",
+];
+
+// ─────────────────────────────────────────────
+// SHORT SUFFIX
+// ─────────────────────────────────────────────
+const SHORT_TECH_SUFFIX = [
+  "ly", "io", "ai", "ix", "xa", "ox", "us", "or", "yx", "el", "an", "ex",
+  "ik", "ak", "ok", "uk", "ek", "il", "al", "ul", "ol", "it", "at",
+  "ot", "ut", "et", "ib", "ab", "ob", "ub", "eb", "ic", "ac", "oc",
+  "uc", "ec", "if", "af", "of", "uf", "ef", "ig", "ag", "og", "ug",
+];
+
+// ─────────────────────────────────────────────
+// BRANDABLE CVCV / generators
+// ─────────────────────────────────────────────
 function genCVCV(rng: () => number): string {
   const c1 = pick(PRIMARY_CONS, rng);
   const v1 = pick(VOWELS_LIST, rng);
@@ -138,10 +191,7 @@ function genCVCCV(rng: () => number): string {
   return `${c1}${v1}${c2}${c3}${v2}`;
 }
 
-export function generateBrandableCVCV(
-  count: number,
-  seed = Date.now(),
-): string[] {
+export function generateBrandableCVCV(count: number, seed = Date.now()): string[] {
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
@@ -169,25 +219,27 @@ export function generateFutureSuffix(
   const seeds = [
     ...prefixes,
     ...trendKeywords.map((k) => k.toLowerCase().replace(/[^a-z]/g, "")),
-  ].filter((s) => s.length >= 3 && s.length <= 6);
+  ].filter((s) => s.length >= 2 && s.length <= 7);
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 40) {
     attempts++;
     const r = rng();
+    let candidate: string;
+    const useMorph = rng() < 0.4;
     if (r < 0.5) {
       const root = pick(seeds, rng);
       const suf = pick(suffixes, rng);
-      const candidate = (root + suf).slice(0, 9);
-      if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
-        out.add(candidate);
+      candidate = (root + suf).slice(0, 9);
     } else {
-      const pre = pick(prefixes, rng).slice(0, 4);
+      const pre = pick(prefixes, rng).slice(0, 5);
       const suf = pick(suffixes, rng);
-      const candidate = (pre + suf).slice(0, 9);
-      if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
-        out.add(candidate);
+      candidate = (pre + suf).slice(0, 9);
     }
+    if (useMorph) candidate = morphed(candidate, rng, 1);
+    candidate = candidate.replace(/[^a-z]/g, "");
+    if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
+      out.add(candidate);
   }
   return Array.from(out);
 }
@@ -198,47 +250,46 @@ export function generateDictionaryHack(
   seed = Date.now(),
 ): string[] {
   const rng = makeRng(seed);
-  const power = ["ai", "deep", "core", "lab", "hub", "go", "io", "x", "now"];
+  const power = ["ai", "deep", "core", "lab", "hub", "go", "io", "x", "now", "fy", "ly", "iq", "bit", "bot", "nix", "vex", "max", "box", "pod"];
   const seeds = trendKeywords
     .map((k) => k.toLowerCase().replace(/[^a-z]/g, ""))
     .filter((s) => s.length >= 3 && s.length <= 6);
-  if (seeds.length === 0) seeds.push("logic", "mind", "core", "wave");
+  if (seeds.length === 0) seeds.push("logic", "mind", "core", "wave", "flux", "node");
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 40) {
     attempts++;
     const a = pick(seeds, rng);
     const b = pick(power, rng);
     const r = rng();
-    const candidate = (r < 0.5 ? a + b : b + a).slice(0, 12);
+    let candidate = (r < 0.5 ? a + b : b + a).slice(0, 12);
+    if (rng() < 0.3) candidate = morphed(candidate, rng, 1);
     if (!hasAwkwardCluster(candidate) && candidate.length >= 4 && isClean(candidate))
       out.add(candidate);
   }
   return Array.from(out);
 }
 
-export function generateTransliteration(
-  count: number,
-  seed = Date.now(),
-): string[] {
+export function generateTransliteration(count: number, seed = Date.now()): string[] {
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 50) {
     attempts++;
     const root = pick(TRANSLIT_ROOTS, rng);
     const suf = pick(TRANSLIT_SUFFIXES, rng);
-    const candidate = (root + suf).toLowerCase().slice(0, 12);
+    let candidate = (root + suf).toLowerCase();
+    // Always morph to break through history saturation
+    const morphOps = rng() < 0.6 ? 1 : 2;
+    candidate = morphed(candidate, rng, morphOps);
+    candidate = candidate.slice(0, 12);
     if (!hasAwkwardCluster(candidate) && candidate.length >= 5 && isClean(candidate))
       out.add(candidate);
   }
   return Array.from(out);
 }
 
-export function generateFourLetter(
-  count: number,
-  seed = Date.now(),
-): string[] {
+export function generateFourLetter(count: number, seed = Date.now()): string[] {
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
@@ -256,101 +307,22 @@ export function generateFourLetter(
   return Array.from(out);
 }
 
-const PREMIUM_PREFIXES = [
-  "neo",
-  "meta",
-  "syn",
-  "omni",
-  "hyper",
-  "ultra",
-  "para",
-  "proto",
-  "trans",
-  "infra",
-  "exo",
-  "endo",
-  "cyber",
-  "bio",
-  "geo",
-  "helio",
-  "lumin",
-  "vivo",
-  "auro",
-  "kine",
-];
-
-const PREMIUM_ROOTS = [
-  "core",
-  "labs",
-  "node",
-  "wave",
-  "loop",
-  "flux",
-  "form",
-  "stack",
-  "grid",
-  "pulse",
-  "field",
-  "mesh",
-  "cell",
-  "byte",
-  "sense",
-  "cast",
-  "scope",
-  "tide",
-  "spark",
-  "drift",
-  "shift",
-  "axis",
-  "orbit",
-  "vector",
-];
-
-const COLOR_TECH = [
-  "lumi",
-  "vivid",
-  "prism",
-  "aqua",
-  "ember",
-  "azure",
-  "indigo",
-  "amber",
-  "ivory",
-  "obsidian",
-  "neon",
-  "violet",
-  "crimson",
-  "ochre",
-  "saffron",
-];
-
-const SHORT_TECH_SUFFIX = [
-  "ly",
-  "io",
-  "ai",
-  "ix",
-  "xa",
-  "ox",
-  "us",
-  "or",
-  "yx",
-  "el",
-  "an",
-  "ex",
-];
-
 export function generatePrefixRoot(count: number, seed = Date.now()): string[] {
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 50) {
     attempts++;
     const p = pick(PREMIUM_PREFIXES, rng);
     const r = pick(PREMIUM_ROOTS, rng);
-    const candidate = (p + r).toLowerCase();
+    let candidate = (p + r).toLowerCase();
+    // Morphing critical for history-saturated strategies
+    const morphOps = rng() < 0.5 ? 1 : rng() < 0.5 ? 2 : 0;
+    if (morphOps > 0) candidate = morphed(candidate, rng, morphOps);
+    candidate = candidate.replace(/[^a-z]/g, "");
     if (
       candidate.length >= 5 &&
-      candidate.length <= 11 &&
+      candidate.length <= 9 &&
       !hasAwkwardCluster(candidate) &&
       isClean(candidate)
     )
@@ -363,14 +335,17 @@ export function generateColorTech(count: number, seed = Date.now()): string[] {
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 50) {
     attempts++;
     const c = pick(COLOR_TECH, rng);
     const r = pick(PREMIUM_ROOTS, rng);
-    const candidate = (c + r).toLowerCase();
+    let candidate = (c + r).toLowerCase();
+    const morphOps = rng() < 0.5 ? 1 : rng() < 0.5 ? 2 : 0;
+    if (morphOps > 0) candidate = morphed(candidate, rng, morphOps);
+    candidate = candidate.replace(/[^a-z]/g, "");
     if (
       candidate.length >= 5 &&
-      candidate.length <= 11 &&
+      candidate.length <= 9 &&
       !hasAwkwardCluster(candidate) &&
       isClean(candidate)
     )
@@ -406,20 +381,21 @@ export function generatePortmanteau(
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 40) {
     attempts++;
     const a = pick(trendKeywords, rng).toLowerCase();
     const b = pick(trendKeywords, rng).toLowerCase();
     if (a === b) continue;
     const splitA = 1 + Math.floor(rng() * Math.max(1, a.length - 1));
     const splitB = 1 + Math.floor(rng() * Math.max(1, b.length - 1));
-    const candidate = (a.slice(0, splitA) + b.slice(splitB)).toLowerCase();
+    let candidate = (a.slice(0, splitA) + b.slice(splitB)).toLowerCase();
+    if (rng() < 0.35) candidate = morphed(candidate, rng, 1);
+    candidate = candidate.replace(/[^a-z]/g, "");
     if (
       candidate.length >= 5 &&
       candidate.length <= 10 &&
       !hasAwkwardCluster(candidate) &&
-      isClean(candidate) &&
-      /^[a-z]+$/.test(candidate)
+      isClean(candidate)
     )
       out.add(candidate);
   }
@@ -430,11 +406,14 @@ export function generateShortSuffix(count: number, seed = Date.now()): string[] 
   const rng = makeRng(seed);
   const out = new Set<string>();
   let attempts = 0;
-  while (out.size < count && attempts < count * 30) {
+  while (out.size < count && attempts < count * 50) {
     attempts++;
     const root = pick(PREMIUM_ROOTS.concat(COLOR_TECH), rng);
     const suf = pick(SHORT_TECH_SUFFIX, rng);
-    const candidate = (root + suf).toLowerCase();
+    let candidate = (root + suf).toLowerCase();
+    const morphOps = rng() < 0.5 ? 1 : 0;
+    if (morphOps > 0) candidate = morphed(candidate, rng, morphOps);
+    candidate = candidate.replace(/[^a-z]/g, "");
     if (
       candidate.length >= 5 &&
       candidate.length <= 9 &&
@@ -476,7 +455,6 @@ export function generate(
   seed = Date.now(),
   excludeNames?: Set<string>,
 ): string[] {
-  // Massively oversample so the 5-7 length + dedup gate still yields `count` names.
   const oversample = Math.max(count * 12, 1500);
   let raw: string[];
   switch (strategy) {
@@ -523,8 +501,7 @@ export function generate(
 }
 
 // Bulk in-memory generation: call generate() repeatedly with shifted seeds until
-// the requested count is satisfied or we've burnt enough rounds. Used by hunter
-// for "evaluated per second" perception while keeping DNS load sane.
+// the requested count is satisfied or we've burnt enough rounds.
 export function generateBulk(
   strategy: string,
   category: string,

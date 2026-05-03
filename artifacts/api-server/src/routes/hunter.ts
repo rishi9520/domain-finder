@@ -5,6 +5,20 @@ import { hunter } from "../lib/hunter";
 
 const router: IRouter = Router();
 
+// 10-second TTL cache for count queries (expensive on 200K+ rows).
+const countCache = new Map<string, { value: number; at: number }>();
+async function cachedCount(
+  cacheKey: string,
+  query: () => Promise<number>,
+  ttlMs = 10_000,
+): Promise<number> {
+  const hit = countCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value;
+  const value = await query();
+  countCache.set(cacheKey, { value, at: Date.now() });
+  return value;
+}
+
 function rowToDiscovery(r: DiscoveryRow) {
   return {
     id: r.id,
@@ -123,27 +137,46 @@ router.get("/hunter/stream", (req: Request, res: Response): void => {
 
 router.get("/discoveries", async (req, res): Promise<void> => {
   const limit = Math.min(Number(req.query.limit ?? 100), 500);
+  const offset = Math.max(0, Number(req.query.offset ?? 0));
   const minScore = Number(req.query.minScore ?? 0);
   const category =
-    typeof req.query.category === "string" ? req.query.category : null;
+    typeof req.query.category === "string" && req.query.category !== "all"
+      ? req.query.category
+      : null;
+  const lengthFilter =
+    typeof req.query.length === "string" ? Number(req.query.length) : null;
 
-  const conds = [gte(discoveriesTable.valueScore, String(minScore))];
+  const conds: ReturnType<typeof gte>[] = [gte(discoveriesTable.valueScore, String(minScore))];
   if (category) conds.push(eq(discoveriesTable.category, category));
+  if (lengthFilter && lengthFilter >= 5 && lengthFilter <= 7) {
+    conds.push(eq(discoveriesTable.length, lengthFilter));
+  }
 
-  const rows = await db
-    .select()
-    .from(discoveriesTable)
-    .where(conds.length === 1 ? conds[0] : and(...conds))
-    .orderBy(desc(discoveriesTable.valueScore), desc(discoveriesTable.discoveredAt))
-    .limit(limit);
+  const where = conds.length === 1 ? conds[0] : and(...conds);
 
-  const totalRow = await db
-    .select({ c: sql<number>`count(*)::int` })
-    .from(discoveriesTable);
-  const total = totalRow[0]?.c ?? 0;
+  const cacheKey = `${minScore}|${category ?? ""}|${lengthFilter ?? ""}`;
+
+  const [rows, total] = await Promise.all([
+    db
+      .select()
+      .from(discoveriesTable)
+      .where(where)
+      .orderBy(desc(discoveriesTable.valueScore), desc(discoveriesTable.discoveredAt))
+      .limit(limit)
+      .offset(offset),
+    cachedCount(cacheKey, async () => {
+      const r = await db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(discoveriesTable)
+        .where(where);
+      return r[0]?.c ?? 0;
+    }),
+  ]);
 
   res.json({
     total,
+    offset,
+    limit,
     items: rows.map(rowToDiscovery),
   });
 });
