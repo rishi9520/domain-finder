@@ -15,8 +15,14 @@ const STRATEGIES = [
   "brandable_cvcv",
   "future_suffix",
   "dictionary_hack",
+  "two_word_brandable",
+  "pronounceable_word",
   "transliteration",
-  "four_letter",
+  "prefix_root",
+  "color_tech",
+  "vowel_start",
+  "portmanteau",
+  "short_suffix",
 ] as const;
 
 function rowToSaved(row: SavedDomainRow) {

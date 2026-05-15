@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { hunter } from "./lib/hunter";
+import { newsIngest } from "./lib/news/ingest";
 import { db, discoveriesTable } from "@workspace/db";
 import { desc } from "drizzle-orm";
 
@@ -35,6 +36,14 @@ app.listen(port, (err) => {
       .catch((err) => logger.error({ err }, "Hunter auto-arm failed"));
     // Kick off a one-shot RDAP re-verification of legacy diamonds in background.
     void hunter.runLegacyCleanup();
+
+    // Start continuous news ingestion (feeds trend signals into hunter).
+    try {
+      newsIngest.start();
+      logger.info({}, "News ingest started");
+    } catch (err) {
+      logger.error({ err }, "News ingest start failed");
+    }
 
     // Warm the DB query plan so the first user-facing discoveries request is fast.
     void db

@@ -223,3 +223,57 @@ export async function fetchDiscoveries(params: {
   if (!res.ok) throw new Error(`Failed: ${res.status}`);
   return (await res.json()) as DiscoveriesResponse;
 }
+
+export interface NewsEvent {
+  id: number;
+  source: string;
+  title: string;
+  url: string | null;
+  categories: string[];
+  keywords: string[];
+  impactScore: number;
+  publishedAt: string;
+  ingestedAt: string;
+}
+
+export interface TrendSignal {
+  keyword: string;
+  category: string;
+  count24h: number;
+  count7d: number;
+  weight: number;
+  lastSeenAt: string;
+}
+
+export interface NewsStatus {
+  running: boolean;
+  lastRunAt: string | null;
+  lastIngested: number;
+  totalIngested: number;
+  totalDuplicates: number;
+  runs: number;
+}
+
+export async function fetchNewsStatus(): Promise<NewsStatus> {
+  const res = await fetch(`${API_BASE}/news/status`);
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as NewsStatus;
+}
+
+export async function fetchRecentNews(limit = 10): Promise<NewsEvent[]> {
+  const res = await fetch(`${API_BASE}/news/events?limit=${limit}`);
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as NewsEvent[];
+}
+
+export async function fetchTopTrends(limit = 20): Promise<TrendSignal[]> {
+  const res = await fetch(`${API_BASE}/news/trends?limit=${limit}`);
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return (await res.json()) as TrendSignal[];
+}
+
+export async function triggerNewsIngest(): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/news/ingest`, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return await res.json();
+}

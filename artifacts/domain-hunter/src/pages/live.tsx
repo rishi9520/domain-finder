@@ -14,11 +14,14 @@ import {
   Flame,
   Gauge,
   Gem,
+  Newspaper,
   Pause,
   Play,
   Radar,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   Trash2,
   Zap,
 } from "lucide-react";
@@ -28,13 +31,19 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   fetchDiscoveries,
+  fetchNewsStatus,
+  fetchRecentNews,
+  fetchTopTrends,
   resetHunterMemory,
   startHunter,
   stopHunter,
   testTelegram,
+  triggerNewsIngest,
   useHunterStream,
   type Discovery,
   type HunterEvent,
+  type NewsEvent,
+  type TrendSignal,
 } from "@/hooks/use-hunter-stream";
 
 const CATEGORIES = [
@@ -298,6 +307,119 @@ function eventDot(kind: HunterEvent["kind"]): string {
   }
 }
 
+function NewsIntelligenceStrip({
+  status,
+  events,
+  trends,
+  onRefresh,
+}: {
+  status: { running: boolean; lastRunAt: string | null; lastIngested: number; totalIngested: number; runs: number } | null;
+  events: NewsEvent[];
+  trends: TrendSignal[];
+  onRefresh: () => void;
+}) {
+  const top5Trends = trends.slice(0, 8);
+  return (
+    <div className="mb-4 rounded-lg border border-violet-400/30 bg-gradient-to-br from-violet-500/10 to-cyan-500/5 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Newspaper className="h-4 w-4 text-violet-300" />
+          <h3 className="text-sm font-semibold">News Intelligence Engine</h3>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {status?.running ? "live" : "idle"}
+            {status?.lastRunAt && ` · last ${timeAgo(status.lastRunAt)}`}
+            {status && ` · ${status.totalIngested.toLocaleString()} events ingested`}
+          </span>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onRefresh}
+          className="h-7 text-[11px] border-violet-400/40 text-violet-300 hover:bg-violet-500/10"
+        >
+          <RefreshCw className="mr-1 h-3 w-3" /> Pull now
+        </Button>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+            Latest market signals (driving keywords into hunter)
+          </div>
+          <ul className="space-y-1.5">
+            {events.length === 0 && (
+              <li className="text-xs text-muted-foreground">Warming up — first ingestion in progress…</li>
+            )}
+            {events.slice(0, 5).map((e) => (
+              <li key={e.id} className="flex items-start gap-2 text-[12px] leading-snug">
+                <span
+                  className={cn(
+                    "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
+                    e.impactScore >= 70
+                      ? "bg-emerald-400"
+                      : e.impactScore >= 50
+                      ? "bg-cyan-400"
+                      : "bg-amber-400",
+                  )}
+                />
+                <div className="min-w-0 flex-1">
+                  {e.url ? (
+                    <a
+                      href={e.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-foreground/90 hover:text-primary truncate block"
+                    >
+                      {e.title}
+                    </a>
+                  ) : (
+                    <span className="text-foreground/90">{e.title}</span>
+                  )}
+                  <div className="flex flex-wrap gap-1.5 mt-0.5">
+                    <span className="text-[10px] text-muted-foreground">{e.source}</span>
+                    <span className="text-[10px] text-muted-foreground">·</span>
+                    <span className="text-[10px] text-muted-foreground">impact {e.impactScore}</span>
+                    {e.categories.map((c) => (
+                      <span
+                        key={c}
+                        className={cn(
+                          "text-[9px] uppercase tracking-wider rounded px-1.5 py-px border",
+                          CATEGORY_COLOR[c] ?? "border-border text-muted-foreground",
+                        )}
+                      >
+                        {CATEGORY_LABEL[c] ?? c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+            <TrendingUp className="h-3 w-3" /> Top trending keywords
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {top5Trends.length === 0 && (
+              <span className="text-xs text-muted-foreground">Aggregating signals…</span>
+            )}
+            {top5Trends.map((t) => (
+              <span
+                key={t.keyword}
+                className="inline-flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-mono text-cyan-200"
+                title={`${t.count24h} mentions in 24h · weight ${t.weight}`}
+              >
+                {t.keyword}
+                <span className="text-cyan-400/60">·{Math.round(t.weight)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function exportCsv(items: Discovery[]) {
   const header = "name,fqdn,score,length,pattern,category,strategy,memorability,radio_test,discovered_at,rdap_status,register_url";
   const rows = items.map((d) =>
@@ -400,8 +522,14 @@ export function Live() {
 
   const handleToggle = useCallback(async () => {
     if (running) await stopHunter();
-    else await startHunter(70);
-  }, [running]);
+    else await startHunter(minScore);
+  }, [running, minScore]);
+
+  // Push slider changes to hunter engine (not just vault filter).
+  useEffect(() => {
+    if (!running) return;
+    void startHunter(minScore).catch(() => {});
+  }, [minScore, running]);
 
   const handleResetMemory = useCallback(async () => {
     await resetHunterMemory();
@@ -426,6 +554,34 @@ export function Live() {
       setTimeout(() => setTelegramStatus("idle"), 5000);
     }
   }, []);
+
+  // News intelligence queries (refresh every 60s).
+  const newsStatusQuery = useQuery({
+    queryKey: ["news-status"],
+    queryFn: fetchNewsStatus,
+    refetchInterval: 60_000,
+  });
+  const recentNewsQuery = useQuery({
+    queryKey: ["news-recent"],
+    queryFn: () => fetchRecentNews(8),
+    refetchInterval: 60_000,
+  });
+  const topTrendsQuery = useQuery({
+    queryKey: ["news-trends"],
+    queryFn: () => fetchTopTrends(20),
+    refetchInterval: 60_000,
+  });
+
+  const handleNewsRefresh = useCallback(async () => {
+    try {
+      await triggerNewsIngest();
+      void queryClient.invalidateQueries({ queryKey: ["news-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["news-recent"] });
+      void queryClient.invalidateQueries({ queryKey: ["news-trends"] });
+    } catch {
+      /* ignore */
+    }
+  }, [queryClient]);
 
   return (
     <div className="px-6 py-6 max-w-[1500px] mx-auto">
@@ -527,6 +683,14 @@ export function Live() {
           </span>
         </div>
       )}
+
+      {/* News Intelligence Strip */}
+      <NewsIntelligenceStrip
+        status={newsStatusQuery.data ?? null}
+        events={recentNewsQuery.data ?? []}
+        trends={topTrendsQuery.data ?? []}
+        onRefresh={handleNewsRefresh}
+      />
 
       {/* Filter strip */}
       <div className="mb-4 rounded-lg border border-border bg-card/30 px-4 py-3 space-y-3">

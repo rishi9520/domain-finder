@@ -2,6 +2,18 @@ import { logger } from "./logger";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
+// Circuit breaker: once Groq returns auth/quota errors, stop calling for the
+// rest of the process lifetime to avoid log spam and wasted latency.
+let groqDisabled = false;
+let groqDisabledReason = "";
+function disableGroq(reason: string) {
+  if (!groqDisabled) {
+    groqDisabled = true;
+    groqDisabledReason = reason;
+    logger.warn({ reason }, "Groq disabled for this process — using fallback (news + static)");
+  }
+}
+
 const STATIC_FALLBACK: Record<
   string,
   { keywords: { keyword: string; weight: number; rationale: string }[]; suffixes: string[]; prefixes: string[] }
@@ -73,10 +85,10 @@ export async function generateTrendsForCategory(
   category: string,
 ): Promise<TrendBundleData> {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    logger.warn(
-      "GROQ_API_KEY not set, returning curated fallback trends",
-    );
+  if (!apiKey || groqDisabled) {
+    if (!apiKey) {
+      logger.warn("GROQ_API_KEY not set, returning curated fallback trends");
+    }
     return STATIC_FALLBACK[category] ?? STATIC_FALLBACK.ai!;
   }
 
@@ -114,6 +126,9 @@ Return ONLY valid JSON, no prose, no markdown fences. Schema:
         { status: response.status, body: txt.slice(0, 200) },
         "Groq error",
       );
+      if (response.status === 401 || response.status === 403 || response.status === 429) {
+        disableGroq(`HTTP ${response.status}`);
+      }
       return STATIC_FALLBACK[category] ?? STATIC_FALLBACK.ai!;
     }
 

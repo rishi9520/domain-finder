@@ -8,6 +8,8 @@ import { dnsAvailabilityBatch, type DnsCheckResult } from "./availability";
 import { rdapBatch } from "./rdap";
 import { logger } from "./logger";
 import { queueTelegramAlert, sendStartupAlert } from "./telegram";
+import { getTrendKeywordsForCategory } from "./news/ingest";
+import { filterLegallyAllowed } from "./legal/gate";
 
 const TELEGRAM_ALERT_THRESHOLD = 96;
 
@@ -275,13 +277,38 @@ class Hunter extends EventEmitter {
   private async getTrends(category: Category): Promise<string[]> {
     const cached = this.trendCache.get(category);
     if (cached && cached.expiresAt > Date.now()) return cached.keywords;
+
+    // Priority 1: live news-derived trend signals (event-driven).
+    const newsSignals = await getTrendKeywordsForCategory(category, 10).catch(() => []);
+    const newsKeywords = newsSignals.map((s) => s.keyword);
+
+    // Priority 2: Groq/static curated bundle (always present).
     const bundle = await generateTrendsForCategory(category);
-    const keywords = bundle.keywords.map((k) => k.keyword);
+    const baseKeywords = bundle.keywords.map((k) => k.keyword);
+
+    // Merge: news signals first (deduped), then base keywords.
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    for (const k of [...newsKeywords, ...baseKeywords]) {
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        merged.push(k);
+      }
+    }
+
+    if (newsKeywords.length > 0) {
+      this.emitEvent({
+        kind: "info",
+        message: `[${category}] news-driven keywords injected: ${newsKeywords.slice(0, 5).join(", ")}`,
+        data: { category, newsKeywords, source: "news_signals" },
+      });
+    }
+
     this.trendCache.set(category, {
-      keywords,
+      keywords: merged,
       expiresAt: Date.now() + 30 * 60 * 1000,
     });
-    return keywords;
+    return merged;
   }
 
   private recordThroughput(checks: number) {
@@ -566,6 +593,26 @@ class Hunter extends EventEmitter {
     }
 
     // Insert diamonds in bulk.
+    if (diamonds.length > 0) {
+      // === LEGAL GATE ===
+      // Filter out trademark-conflict and review-tier names before persistence.
+      const legalResult = await filterLegallyAllowed(
+        diamonds.map((d) => ({ ...d, fqdn: d.fqdn, name: d.name })),
+      );
+      const blockedCount = legalResult.blocked.length + legalResult.reviewed.length;
+      if (blockedCount > 0) {
+        this.emitEvent({
+          kind: "info",
+          message: `Legal gate blocked ${blockedCount} candidates (TM risk)`,
+          data: {
+            blocked: legalResult.blocked.map((d) => d.fqdn),
+            reviewed: legalResult.reviewed.map((d) => d.fqdn),
+          },
+        });
+      }
+      diamonds = legalResult.allowed;
+    }
+
     if (diamonds.length > 0) {
       const rows = diamonds.map((d) => ({
         fqdn: d.fqdn,
