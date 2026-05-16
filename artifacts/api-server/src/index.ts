@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { hunter } from "./lib/hunter";
 import { newsIngest } from "./lib/news/ingest";
+import { workerRegistry } from "./lib/workers/registry";
 import { db, discoveriesTable } from "@workspace/db";
 import { desc } from "drizzle-orm";
 
@@ -44,6 +45,11 @@ app.listen(port, (err) => {
     } catch (err) {
       logger.error({ err }, "News ingest start failed");
     }
+
+    // Register all 12 Codicore workers in the DB so the /workers UI lights up.
+    void workerRegistry
+      .initialize()
+      .catch((err) => logger.error({ err }, "Worker registry init failed"));
 
     // Warm the DB query plan so the first user-facing discoveries request is fast.
     void db
