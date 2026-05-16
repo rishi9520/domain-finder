@@ -1,6 +1,9 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -30,5 +33,25 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Serve the built domain-hunter SPA in production.
+// The bundled file lives at artifacts/api-server/dist/index.mjs, so the
+// frontend build sits at ../../domain-hunter/dist/public relative to it.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const candidates = [
+  path.resolve(here, "../../domain-hunter/dist/public"),
+  path.resolve(here, "../../../artifacts/domain-hunter/dist/public"),
+  path.resolve(process.cwd(), "artifacts/domain-hunter/dist/public"),
+];
+const frontendDir = candidates.find((p) => fs.existsSync(path.join(p, "index.html")));
+if (frontendDir) {
+  logger.info({ frontendDir }, "Serving frontend SPA");
+  app.use(express.static(frontendDir, { index: false, maxAge: "1h" }));
+  app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(path.join(frontendDir, "index.html"));
+  });
+} else {
+  logger.warn({ candidates }, "Frontend build not found — only /api will be served");
+}
 
 export default app;
